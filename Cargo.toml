@@ -1,0 +1,48 @@
+[package]
+name = "macropad_configurator"
+version = "0.1.0"
+edition = "2021"
+description = "A"
+
+[package.metadata.bundle]
+name = "Macropad Configurator"
+identifier = "io.github.arfrie22.macropad_configurator"
+icon = ["assets/icon/png/*.png"]
+# version = "1.0.0"
+# resources = ["assets", "images/**/*.png"]
+copyright = "Copyright (c) arfrie22 2022. All rights reserved."
+category = "Developer Tool"
+short_description = "A programmer for the 2x2 Macropad."
+long_description = """
+A tool that allows you to custmize the 4 buttons on the 2x2 Macropad 
+used for a UMass All Campus Makerspace workshop.
+"""
+# deb_depends = ["libgl1-mesa-glx", "libsdl2-2.0-0 (>= 2.0.5)"]
+# osx_frameworks = ["SDL2"]
+osx_url_schemes = ["io.github.arfrie22.macropad_configurator"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+device_query = "1.1.1"
+iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg"] }
+futures = "0.3.25"
+iced_native = { version = "0.7"}
+iced_futures = { version = "0.5.1"}
+hidapi = "2.0.2"
+dark-light = "0.2.3"
+reqwest = { version = "0.11.13", features = ["json", "rustls-tls"] }
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.87"
+rand = { version = "0.7", features = ["wasm-bindgen"]}
+
+usbd-human-interface-device = "0.3.1"
+
+rusb = "0.9"
+
+crc = "3.0"
+strum_macros = "0.24"
+strum = { version = "0.24", default-features = false, features = ["strum_macros", "derive"] }
+macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol" }
+async-std = "1.12.0"
