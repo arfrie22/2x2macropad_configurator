@@ -1,7 +1,10 @@
 use std::time::Duration;
 
-use macropad_protocol::{macro_protocol::MacroCommand, hid_wrapper};
+use hidapi::HidDevice;
+use macropad_protocol::{macro_protocol::MacroCommand, data_protocol::{KeyMode, LedEffect}};
 use usbd_human_interface_device::page::{Consumer, Keyboard};
+
+use crate::macropad_wrapper;
 
 #[derive(Debug, Clone)]
 pub struct MacroFrame {
@@ -23,11 +26,137 @@ pub struct Macro {
     pub frames: Vec<MacroFrame>,
 }
 
-pub fn parse_macro(data: [u8; 4092]) -> Macro {
+impl Default for Macro {
+    fn default() -> Self {
+        Self {
+            frames: vec![MacroFrame {
+                actions: vec![],
+                delay: None,
+            }],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MacroConfig {
+    pub tap_speed: u32,
+    pub hold_speed: u32,
+    pub default_delay: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct KeyConfig {
+    pub key_mode: KeyMode,
+    pub keyboard_data: Keyboard,
+    pub consumer_data: Consumer,
+    pub key_color: (u8, u8, u8),
+}
+
+#[derive(Debug, Clone)]
+pub struct LedConfig {
+    pub base_color: (u8, u8, u8),
+    pub effect: LedEffect,
+    pub brightness: u8,
+    pub effect_speed: f32,
+    pub effect_offset: f32,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct MacroCollection {
+    pub tap: Macro,
+    pub hold: Macro,
+    pub double_tap: Macro,
+    pub tap_hold: Macro,
+}
+
+#[derive(Debug, Clone)]
+pub struct Macropad {
+    pub macros: Vec<MacroCollection>,
+    pub config: MacroConfig,
+    pub key_configs: Vec<KeyConfig>,
+    pub led_config: LedConfig,
+}
+
+pub fn get_key_config(device: &HidDevice, index: u8) -> Result<KeyConfig, ()> {
+    let key_mode =  macropad_wrapper::get_key_mode(device, index)?;
+    let keyboard_data = macropad_wrapper::get_keyboard_data(device, index)?;
+    let consumer_data = macropad_wrapper::get_consumer_data(device, index)?;
+    let key_color = macropad_wrapper::get_key_color(device, index)?;
+
+
+    Ok(KeyConfig { key_mode, keyboard_data, consumer_data, key_color})
+}
+
+pub fn get_macro(device: &HidDevice, index: u8) -> Result<Macro, ()> {
+    let data = macropad_wrapper::get_macro(device, index)?;
+    Ok(parse_macro(&data))
+}
+
+pub fn get_macro_collection(device: &HidDevice, index: u8) -> Result<MacroCollection, ()> {
+    let mut collection = MacroCollection::default();
+
+    for m in 0..4 {
+        let data = macropad_wrapper::get_macro(device, (index << 2) | m)?;
+        let macro_data = parse_macro(&data);
+        match m {
+            0 => collection.tap = macro_data,
+            1 => collection.hold = macro_data,
+            2 => collection.double_tap = macro_data,
+            3 => collection.tap_hold = macro_data,
+            _ => (),
+        }
+    }
+
+    Ok(collection)
+}
+
+pub fn get_config(device: &HidDevice) -> Result<MacroConfig, ()> {
+    let tap_speed = macropad_wrapper::get_tap_speed(device)?;
+    let hold_speed = macropad_wrapper::get_hold_speed(device)?;
+    let default_delay = macropad_wrapper::get_default_delay(device)?;
+
+    Ok(MacroConfig {
+        tap_speed,
+        hold_speed,
+        default_delay,
+    })
+}
+
+pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
+    let base_color = macropad_wrapper::get_base_color(device)?;
+    let effect = macropad_wrapper::get_led_effect(device)?;
+    let brightness = macropad_wrapper::get_brightness(device)?;
+    let effect_speed = macropad_wrapper::get_effect_speed(device)?;
+    let effect_offset = macropad_wrapper::get_effect_offset(device)?;
+
+    Ok(LedConfig {
+        base_color,
+        effect,
+        brightness,
+        effect_speed,
+        effect_offset,
+    })
+}
+
+pub fn get_macro_pad(device: &HidDevice) -> Result<Macropad, ()> {
+    let mut macros = Vec::new();
+    let config = get_config(device)?;
+    let mut key_configs = Vec::new();
+    let led_config = get_led_config(device)?;
+
+    for index in 0..4 {
+        macros.push(get_macro_collection(device, index)?);
+        key_configs.push(get_key_config(device, index)?);
+    }
+
+    Ok(Macropad { macros, config, key_configs, led_config })
+}
+
+pub fn parse_macro(data: &[u8; 4092]) -> Macro {
     let mut frames = Vec::new();
 
     let mut i = 0;
-    let mut command = MacroCommand::from_u8(data[i]).unwrap();
+    let mut command = MacroCommand::from(data[i]);
     while command != MacroCommand::CommandTerminator {
         let mut actions = Vec::new();
         let mut delay = None;
@@ -40,17 +169,17 @@ pub fn parse_macro(data: [u8; 4092]) -> Macro {
                     i += 5;
                 }
                 MacroCommand::CommandPressKey => {
-                    let key = hid_wrapper::keyboard_from_u8(data[i + 1]).unwrap();
+                    let key = Keyboard::from(data[i + 1]);
                     actions.push(MacroAction::PressKey(key));
                     i += 2;
                 }
                 MacroCommand::CommandReleaseKey => {
-                    let key = hid_wrapper::keyboard_from_u8(data[i + 1]).unwrap();
+                    let key = Keyboard::from(data[i + 1]);
                     actions.push(MacroAction::ReleaseKey(key));
                     i += 2;
                 }
                 MacroCommand::CommandConsumer => {
-                    let key = hid_wrapper::consumer_from_u16(u16::from_le_bytes([data[i + 1], data[i + 2]])).unwrap();
+                    let key = Consumer::from(u16::from_le_bytes([data[i + 1], data[i + 2]]));
                     actions.push(MacroAction::Consumer(key));
                     i += 3;
                 }
@@ -67,14 +196,14 @@ pub fn parse_macro(data: [u8; 4092]) -> Macro {
                 }
                 _ => {}
             }
-            command = MacroCommand::from_u8(data[i]).unwrap();
+            command = MacroCommand::from(data[i]);
         }
         frames.push(MacroFrame {
             actions,
             delay,
         });
         i += 1;
-        command = MacroCommand::from_u8(data[i]).unwrap();
+        command = MacroCommand::from(data[i]);
     }
 
     Macro {

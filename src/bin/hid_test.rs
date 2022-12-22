@@ -62,7 +62,7 @@ fn main () {
             for i in 0..(MACRO_SIZE/59) {
                 let offset: u16 = i as u16 * 59;
                 let size = if offset as usize + 59 > MACRO_SIZE { MACRO_SIZE % 59 } else { 59 };
-                data[1] = 0x03;
+                data[1] = macropad_protocol::data_protocol::DataCommand::WriteMacro as u8;
                 data[2] = 0x00;
                 data[3] = (offset >> 8) as u8;
                 data[4] = (offset & 0xFF) as u8;
@@ -80,7 +80,7 @@ fn main () {
 
             data = [0u8; 65];
             println!("Reading macro");
-            data[1] = 0x02;
+            data[1] = macropad_protocol::data_protocol::DataCommand::ReadMacro as u8;
             data[2] = 0x00;
             data[3] = 0x00;
             data[4] = 0x00;

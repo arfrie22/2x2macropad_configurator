@@ -3,6 +3,7 @@ name = "macropad_configurator"
 version = "0.1.0"
 edition = "2021"
 description = "A"
+default-run = "main"
 
 [package.metadata.bundle]
 name = "Macropad Configurator"
@@ -26,7 +27,7 @@ osx_url_schemes = ["io.github.arfrie22.macropad_configurator"]
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 device_query = "1.1.1"
-iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg"] }
+iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg", "canvas"] }
 futures = "0.3.25"
 iced_native = { version = "0.7"}
 iced_futures = { version = "0.5.1"}
@@ -46,3 +47,5 @@ strum_macros = "0.24"
 strum = { version = "0.24", default-features = false, features = ["strum_macros", "derive"] }
 macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol" }
 async-std = "1.12.0"
+
+num_enum = { version = "0.5.7"}
