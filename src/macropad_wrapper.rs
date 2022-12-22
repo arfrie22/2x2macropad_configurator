@@ -18,6 +18,11 @@ pub fn send_command(device: &HidDevice, command: [u8; 65]) -> Result<[u8; 64], (
     }
 }
 
+pub fn prime_device(device: &HidDevice) -> Result<(), ()> {
+    send_command(device, [0u8; 65])?;
+    Ok(())
+}
+
 pub fn get_key_mode(device: &HidDevice, index: u8) -> Result<KeyMode, ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::ReadKeyConfig as u8;
@@ -179,6 +184,33 @@ pub fn set_macro(device: &HidDevice, index: u8, macro_data: &[u8; 4092]) -> Resu
     }
 
     Ok(())
+}
+
+pub fn validate_macro(device: &HidDevice, index: u8, macro_data: &[u8; 4092]) -> Result<(), ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::ValidateMacro as u8;
+    data[2] = index;
+    data[3..7].copy_from_slice(&CKSUM.checksum(macro_data).to_le_bytes());
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] || buf[2..6] != buf[6..10]{
+        Err(())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn clear_macro(device: &HidDevice, index: u8) -> Result<(), ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::ClearMacro as u8;
+    data[2] = index;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        Ok(())
+    }
 }
 
 pub fn get_tap_speed(device: &HidDevice) -> Result<u32, ()> {
