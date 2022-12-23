@@ -12,6 +12,33 @@ pub struct MacroFrame {
     pub delay: Option<Duration>,
 }
 
+impl Default for MacroFrame {
+    fn default() -> Self {
+        Self {
+            actions: vec![],
+            delay: None,
+        }
+    }
+}
+
+impl MacroFrame {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from(actions: Vec<MacroAction>, delay: Option<Duration>) -> Self {
+        Self {
+            actions,
+            delay,
+        }
+    }
+
+    pub fn add_action(&mut self, action: MacroAction) -> &mut Self {
+        self.actions.push(action);
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MacroAction {
     PressKey(Keyboard),
