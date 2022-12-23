@@ -57,7 +57,7 @@ pub struct LedConfig {
     pub base_color: (u8, u8, u8),
     pub effect: LedEffect,
     pub brightness: u8,
-    pub effect_speed: f32,
+    pub effect_period: f32,
     pub effect_offset: f32,
 }
 
@@ -126,14 +126,14 @@ pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
     let base_color = macropad_wrapper::get_base_color(device)?;
     let effect = macropad_wrapper::get_led_effect(device)?;
     let brightness = macropad_wrapper::get_brightness(device)?;
-    let effect_speed = macropad_wrapper::get_effect_speed(device)?;
+    let effect_period = macropad_wrapper::get_effect_period(device)?;
     let effect_offset = macropad_wrapper::get_effect_offset(device)?;
 
     Ok(LedConfig {
         base_color,
         effect,
         brightness,
-        effect_speed,
+        effect_period,
         effect_offset,
     })
 }

@@ -1,6 +1,6 @@
 use hidapi::HidApi;
 use macropad_configurator::{macropad_wrapper::{self, prime_device}, macro_parser::{parse_macro, self}};
-use macropad_protocol::data_protocol::{LedEffect, KeyMode};
+use macropad_protocol::{data_protocol::{LedEffect, KeyMode}, macro_protocol::MacroCommand};
 use usbd_human_interface_device::page::Consumer;
 
 fn main() {
@@ -20,11 +20,18 @@ fn main() {
 
             let macro_data = [0u8; 4092];
             
-            macropad_wrapper::clear_macro(&d, 4).unwrap();
+            macropad_wrapper::set_base_color(&d, (255, 0, 0)).unwrap();
+            macropad_wrapper::set_led_effect(&d, LedEffect::Breathing).unwrap();
+            macropad_wrapper::set_effect_period(&d, 5.0).unwrap();
+
+            macropad_wrapper::clear_macro(&d, 0).unwrap();
             macropad_wrapper::set_macro(&d, 0, &macro_data).unwrap();
             macropad_wrapper::validate_macro(&d, 0, &macro_data).unwrap();
             
 
+            println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
+            println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
+            println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
         }
     }

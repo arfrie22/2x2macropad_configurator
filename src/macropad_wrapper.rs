@@ -377,10 +377,10 @@ pub fn set_brightness(device: &HidDevice, brightness: u8) -> Result<(), ()> {
     }
 }
 
-pub fn get_effect_speed(device: &HidDevice) -> Result<f32, ()> {
+pub fn get_effect_period(device: &HidDevice) -> Result<f32, ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::GetLed as u8;
-    data[2] = LedCommand::EffectSpeed as u8;
+    data[2] = LedCommand::EffectPeriod as u8;
     let buf = send_command(device, data)?;
 
     if data[1..3] != buf[0..2] {
@@ -390,10 +390,10 @@ pub fn get_effect_speed(device: &HidDevice) -> Result<f32, ()> {
     }
 }
 
-pub fn set_effect_speed(device: &HidDevice, speed: f32) -> Result<(), ()> {
+pub fn set_effect_period(device: &HidDevice, speed: f32) -> Result<(), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::SetLed as u8;
-    data[2] = LedCommand::EffectSpeed as u8;
+    data[2] = LedCommand::EffectPeriod as u8;
     data[3..7].copy_from_slice(&speed.to_le_bytes());
     let buf = send_command(device, data)?;
 

@@ -2080,9 +2080,9 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libc"
-version = "0.2.138"
+version = "0.2.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6d7e329c562c5dfab7a46a2afabc8b987ab9a4834c9d1ca04dc54c1546cef8"
+checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "libloading"
@@ -2229,7 +2229,7 @@ dependencies = [
 [[package]]
 name = "macropad_protocol"
 version = "0.1.0"
-source = "git+https://github.com/arfrie22/2x2macropad_protocol#f15d8ec20bfa6c4c7ac891150ef7018b72a1696b"
+source = "git+https://github.com/arfrie22/2x2macropad_protocol#b164291240f5a84ee499c8a7f3bb2ef6a3f828e4"
 dependencies = [
  "num_enum",
  "packed_struct",
