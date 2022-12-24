@@ -130,7 +130,8 @@ impl Application for Configurator {
                     //     .width(Length::Fill)
                     //     .horizontal_alignment(iced::alignment::Horizontal::Center),
                     
-                    macropad::macropad_led([iced::Color::from_rgb(1.0, 0.0, 0.5); 4])
+                    // macropad::macropad_led([iced::Color::from_rgb(1.0, 0.0, 0.5); 4])
+                    macropad::macropad_button()
                         // .width(Length::Fill)
                         // .height(Length::Fill)
                         // .center_x()

@@ -32,12 +32,16 @@ use iced_native::{Element, Length, Point, Rectangle, Size, Vector};
 pub struct Macropad {
     pub interactable: bool,
     pub glow: [Color; 4],   
+    selected: Option<usize>,
+    clicked: bool,
 }
 
 pub fn macropad(interactable: bool, glow: [Color; 4]) -> Macropad {
     Macropad {
         interactable,
         glow,
+        selected: None,
+        clicked: false,
     }
 }
 
@@ -49,6 +53,37 @@ pub fn macropad_led(glow: [Color; 4]) -> Macropad {
     macropad(false, glow)
 }
 
+impl Macropad {
+    fn get_keys(&self, b: &Rectangle) -> Vec<Rectangle<f32>> {
+        vec![
+            Rectangle {
+                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
+                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
+                width: 14.0 / 70.0 * b.width,
+                height: 14.0 / 70.0 * b.width,
+            },
+            Rectangle {
+                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
+                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
+                width: 14.0 / 70.0 * b.width,
+                height: 14.0 / 70.0 * b.width,
+            },
+            Rectangle {
+                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
+                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
+                width: 14.0 / 70.0 * b.width,
+                height: 14.0 / 70.0 * b.width,
+            },
+            Rectangle {
+                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
+                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
+                width: 14.0 / 70.0 * b.width,
+                height: 14.0 / 70.0 * b.width,
+            }
+        ]
+    }
+}
+
 impl<Message, B, T> Widget<Message, Renderer<B, T>> for Macropad
 where
     B: Backend,
@@ -58,13 +93,56 @@ where
     }
 
     fn height(&self) -> Length {
-        Length::Fill
+        Length::Shrink
     }
 
     fn layout(&self, _renderer: &Renderer<B, T>, limits: &layout::Limits) -> layout::Node {
         let size = limits.width(Length::Fill).resolve(Size::ZERO);
 
         layout::Node::new(Size::new(size.width, size.width))
+    }
+
+    fn on_event(
+            &mut self,
+            _state: &mut widget::Tree,
+            event: iced::Event,
+            layout: Layout<'_>,
+            cursor_position: Point,
+            _renderer: &Renderer<B, T>,
+            _clipboard: &mut dyn iced_native::Clipboard,
+            _shell: &mut iced_native::Shell<'_, Message>,
+        ) -> iced::event::Status {
+        if self.interactable {
+            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
+                for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
+                    if key.contains(cursor_position) {
+                        self.selected = Some(i);
+                        return iced::event::Status::Captured;
+                    }
+                }
+                self.selected = None;
+                self.clicked = false;
+            }
+
+            if let Some(i) = self.selected {
+                match event {
+                    iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
+                        self.clicked = true;
+                        return iced::event::Status::Captured;
+                    }
+                    iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                        if self.clicked {
+                            println!("Key {} clicked", i);
+                            self.clicked = false;
+                            return iced::event::Status::Captured;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        iced::event::Status::Ignored
     }
 
     fn draw(
@@ -142,32 +220,7 @@ where
             }
         ];
 
-        let keys = vec![
-            Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
-            },
-            Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
-            },
-            Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
-            },
-            Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
-            }
-        ];
+        
 
         renderer.draw_primitive(plug);
         renderer.draw_primitive(board);
@@ -182,10 +235,10 @@ where
              });
         }
 
-        for key in keys {
+        for (i, key) in self.get_keys(&b).iter().enumerate() {
             renderer.draw_primitive(Primitive::Quad { 
-                bounds: key,
-                background: if self.interactable && key.contains(cursor_position) {
+                bounds: *key,
+                background: if !self.clicked && self.selected == Some(i) {
                     Background::Color(Color::from_rgb8(0xA0, 0xA0, 0xA0))
                 } else {
                     Background::Color(Color::WHITE)
