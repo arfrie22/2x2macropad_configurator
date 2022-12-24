@@ -29,7 +29,7 @@ tokio = { version = "1", features = ["full"] }
 device_query = "1.1.1"
 iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg", "canvas"] }
 futures = "0.3.25"
-iced_native = { version = "0.7"}
+iced_native = "0.7"
 iced_futures = { version = "0.5.1"}
 hidapi = "2.0.2"
 dark-light = "0.2.3"
@@ -49,3 +49,5 @@ macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol" }
 async-std = "1.12.0"
 
 num_enum = { version = "0.5.7"}
+iced_wgpu = "0.7.0"
+iced_graphics = "0.5.0"

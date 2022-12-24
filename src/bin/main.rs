@@ -4,7 +4,7 @@ use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
 };
-use macropad_configurator::{hid_manager, macro_parser};
+use macropad_configurator::{hid_manager, macro_parser, macropad};
 
 const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
@@ -119,16 +119,23 @@ impl Application for Configurator {
             },
             State::Connected(_, Page::MainPage) => {
                 let message = column![
-                    text("Main Page")
-                        .font(ROBOTO)
-                        .size(60)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
-                    text("This is the main page")
-                        .font(ROBOTO)
-                        .size(30)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    // text("Main Page")
+                    //     .font(ROBOTO)
+                    //     .size(60)
+                    //     .width(Length::Fill)
+                    //     .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    // text("This is the main page")
+                    //     .font(ROBOTO)
+                    //     .size(30)
+                    //     .width(Length::Fill)
+                    //     .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    
+                    macropad::macropad_led([iced::Color::from_rgb(1.0, 0.0, 0.5); 4])
+                        // .width(Length::Fill)
+                        // .height(Length::Fill)
+                        // .center_x()
+                        // .center_y()
+                        // .padding(20)
                 ];
 
                 container(message)
