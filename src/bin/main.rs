@@ -1,9 +1,13 @@
+use std::time::{Duration, Instant};
+
 use iced::{executor, window, Font};
 use iced::widget::{button, column, container, progress_bar, text, Column};
 use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
 };
+use macropad_configurator::led_effects::LedRunner;
+use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::{hid_manager, macro_parser, macropad};
 
 const ROBOTO: Font = iced::Font::External {
@@ -42,6 +46,10 @@ pub enum Message {
     CommandSent(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandReceived(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandErrored,
+    ButtonPressed(usize),
+    ButtonMainPage,
+    ButtonLedPage,
+    LedUpdate(Instant),
 }
 
 impl Application for Configurator {
@@ -73,7 +81,7 @@ impl Application for Configurator {
         match message {
             Message::HidMessage(_) => {}
             Message::HidEvent(hid_manager::Event::Connected(connection)) => {
-                self.state = State::Connected(connection, Page::MainPage);
+                self.state = State::Connected(connection, Page::ModifyLeds(LedRunner::default()));
             }
             Message::HidEvent(hid_manager::Event::Disconnected) => {
                 self.state = State::Disconnected;
@@ -84,13 +92,59 @@ impl Application for Configurator {
             Message::CommandSent(_, _) => {}
             Message::CommandReceived(_, _) => {}
             Message::CommandErrored => {}
+            Message::ButtonPressed(i) => {
+                self.state = State::Connected(
+                    match &self.state {
+                        State::Connected(connection, _) => connection.clone(),
+                        _ => unreachable!(),
+                    },
+                    Page::ModifyKey(i),
+                );
+            }
+            Message::ButtonMainPage => {
+                self.state = State::Connected(
+                    match &self.state {
+                        State::Connected(connection, _) => connection.clone(),
+                        _ => unreachable!(),
+                    },
+                    Page::MainPage,
+                );
+            }
+            Message::ButtonLedPage => {
+                self.state = State::Connected(
+                    match &self.state {
+                        State::Connected(connection, _) => connection.clone(),
+                        _ => unreachable!(),
+                    },
+                    Page::ModifyLeds(LedRunner::default()),
+                );
+            }
+            Message::LedUpdate(_) => {
+                if let State::Connected(_, Page::ModifyLeds(led_runner)) = &mut self.state {
+                    let cfg = LedConfig {
+                        base_color: (255, 0, 128),
+                        effect: macropad_protocol::data_protocol::LedEffect::None,
+                        brightness: 255,
+                        effect_period: 5.0,
+                        effect_offset: 0.0,
+                    };
+                    led_runner.update(&cfg);
+                }
+            }
         };
 
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        hid_manager::connect().map(Message::HidEvent)
+        Subscription::batch([
+            hid_manager::connect().map(Message::HidEvent),
+            iced::time::every(Duration::from_millis(16))
+                .map(Message::LedUpdate),
+        ])
+        // time::every(Duration::from_millis(1000 / self.speed as u64))
+        //         .map(Message::Tick)
+        // hid_manager::connect().map(Message::HidEvent)
     }
 
     fn view(&self) -> Element<Message> {
@@ -119,24 +173,83 @@ impl Application for Configurator {
             },
             State::Connected(_, Page::MainPage) => {
                 let message = column![
-                    // text("Main Page")
-                    //     .font(ROBOTO)
-                    //     .size(60)
-                    //     .width(Length::Fill)
-                    //     .horizontal_alignment(iced::alignment::Horizontal::Center),
-                    // text("This is the main page")
-                    //     .font(ROBOTO)
-                    //     .size(30)
-                    //     .width(Length::Fill)
-                    //     .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    text("Main Page")
+                        .font(ROBOTO)
+                        .size(60)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    text("This is the main page")
+                        .font(ROBOTO)
+                        .size(30)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
                     
                     // macropad::macropad_led([iced::Color::from_rgb(1.0, 0.0, 0.5); 4])
-                    macropad::macropad_button()
+                    macropad::macropad_button().on_press(Message::ButtonPressed)
                         // .width(Length::Fill)
                         // .height(Length::Fill)
                         // .center_x()
                         // .center_y()
                         // .padding(20)
+                ];
+
+                container(message)
+                    // .width(Length::Shrink)
+                    // .height(Length::Shrink)
+                    .center_x()
+                    .center_y()
+                    .padding(100)
+                    .into()
+            },
+            State::Connected(_, Page::ModifyLeds(runner)) => {
+                let cfg = LedConfig {
+                    base_color: (255, 0, 128),
+                    effect: macropad_protocol::data_protocol::LedEffect::BreathingSpaced,
+                    brightness: 255,
+                    effect_period: 1.0,
+                    effect_offset: 0.0,
+                };
+
+                let message = column![
+                    text("Main Page")
+                        .font(ROBOTO)
+                        .size(60)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    text("This is the main page")
+                        .font(ROBOTO)
+                        .size(30)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    
+                    macropad::macropad_led(runner.get_leds(&cfg))
+                ];
+
+                container(message)
+                    // .width(Length::Shrink)
+                    // .height(Length::Shrink)
+                    .center_x()
+                    .center_y()
+                    .padding(100)
+                    .into()
+            },
+            State::Connected(_, Page::ModifyKey(_)) => {
+                let message = column![
+                    text("Modify Key")
+                        .font(ROBOTO)
+                        .size(60)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    text("This is the modify key page")
+                        .font(ROBOTO)
+                        .size(30)
+                        .width(Length::Fill)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    button("Back")
+                        .on_press(Message::ButtonMainPage)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .padding(20)
                 ];
 
                 container(message)
@@ -147,9 +260,7 @@ impl Application for Configurator {
                     .padding(20)
                     .into()
             },
-            State::Connected(_, Page::ModifyKey(_)) => todo!(),
             State::Connected(_, Page::RecordMacro(_)) => todo!(),
-            State::Connected(_, Page::ModifyLeds) => todo!(),
         }
     }
 
@@ -161,9 +272,9 @@ impl Application for Configurator {
 #[derive(Debug)]
 enum Page {
     MainPage,
+    ModifyLeds(LedRunner),
     ModifyKey(usize),
     RecordMacro(usize),
-    ModifyLeds,
 }
 
 #[derive(Debug)]

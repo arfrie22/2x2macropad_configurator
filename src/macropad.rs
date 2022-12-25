@@ -28,72 +28,84 @@ use iced_native::{Element, Length, Point, Rectangle, Size, Vector};
 // implemented by `iced_wgpu` and other renderers.
 
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Macropad {
+#[derive(Default)]
+pub struct Macropad<'a, Message> {
     pub interactable: bool,
     pub glow: [Color; 4],   
     selected: Option<usize>,
     clicked: bool,
+    message: Option<Box<dyn Fn(usize) -> Message + 'a>>,
 }
 
-pub fn macropad(interactable: bool, glow: [Color; 4]) -> Macropad {
+pub fn macropad<'a, Message>(interactable: bool, glow: [Color; 4], message: Option<Box<dyn Fn(usize) -> Message + 'a>>) -> Macropad<'a, Message> {
     Macropad {
         interactable,
         glow,
         selected: None,
         clicked: false,
+        message
     }
 }
 
-pub fn macropad_button() -> Macropad {
-    macropad(true, [Color::TRANSPARENT; 4])
+pub fn macropad_button<'a, Message>() -> Macropad<'a, Message> {
+    macropad(true, [Color::TRANSPARENT; 4], None)
 }
 
-pub fn macropad_led(glow: [Color; 4]) -> Macropad {
-    macropad(false, glow)
+pub fn macropad_led<'a, Message>(glow: [Color; 4]) -> Macropad<'a, Message> {
+    macropad(false, glow, None)
 }
 
-impl Macropad {
+impl<'a, Message> Macropad<'a, Message> {
+
+    pub fn on_press<F>(mut self, message: F) -> Self 
+    where F: 'a + Fn(usize) -> Message,
+    {
+        self.message = Some(Box::new(message));
+        self
+    }
+
     fn get_keys(&self, b: &Rectangle) -> Vec<Rectangle<f32>> {
+        let len = b.width.min(b.height);
+
         vec![
             Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
+                x: b.x + ((35.0 - 16.525) / 70.0 * len),
+                y: b.y + ((35.0 - 16.525) / 70.0 * len),
+                width: 14.0 / 70.0 * len,
+                height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
+                x: b.x + ((35.0 - 16.525) / 70.0 * len),
+                y: b.y + ((35.0 + 2.525) / 70.0 * len),
+                width: 14.0 / 70.0 * len,
+                height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
+                x: b.x + ((35.0 + 2.525) / 70.0 * len),
+                y: b.y + ((35.0 + 2.525) / 70.0 * len),
+                width: 14.0 / 70.0 * len,
+                height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525) / 70.0 * b.width),
-                width: 14.0 / 70.0 * b.width,
-                height: 14.0 / 70.0 * b.width,
+                x: b.x + ((35.0 + 2.525) / 70.0 * len),
+                y: b.y + ((35.0 - 16.525) / 70.0 * len),
+                width: 14.0 / 70.0 * len,
+                height: 14.0 / 70.0 * len,
             }
         ]
     }
 }
 
-impl<Message, B, T> Widget<Message, Renderer<B, T>> for Macropad
+impl<'a, Message, B, T> Widget<Message, Renderer<B, T>> for Macropad<'a, Message>
 where
     B: Backend,
 {
     fn width(&self) -> Length {
-        Length::Shrink
+        Length::Units(10)
     }
 
     fn height(&self) -> Length {
-        Length::Shrink
+        Length::Units(10)
     }
 
     fn layout(&self, _renderer: &Renderer<B, T>, limits: &layout::Limits) -> layout::Node {
@@ -110,7 +122,7 @@ where
             cursor_position: Point,
             _renderer: &Renderer<B, T>,
             _clipboard: &mut dyn iced_native::Clipboard,
-            _shell: &mut iced_native::Shell<'_, Message>,
+            shell: &mut iced_native::Shell<'_, Message>,
         ) -> iced::event::Status {
         if self.interactable {
             if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
@@ -133,6 +145,7 @@ where
                     iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
                         if self.clicked {
                             println!("Key {} clicked", i);
+                            shell.publish(self.message.as_ref().unwrap()(i));
                             self.clicked = false;
                             return iced::event::Status::Captured;
                         }
@@ -160,30 +173,32 @@ where
 
         let b = layout.bounds();
 
+        let len = b.width.min(b.height);
+
         let board = Primitive::Quad {
             bounds: Rectangle {
-                x: b.x + 5.0 / 70.0 * b.width,
-                y: b.y + 5.0 / 70.0 * b.width,
-                width: 60.0 / 70.0 * b.width,
-                height: 60.0 / 70.0 * b.width,
+                x: b.x + 5.0 / 70.0 * len,
+                y: b.y + 5.0 / 70.0 * len,
+                width: 60.0 / 70.0 * len,
+                height: 60.0 / 70.0 * len,
             },
             background: Background::Color(Color::from_rgb8(0x8D, 0x36, 0xCB)),
-            border_radius: [5.0 / 70.0 * b.width; 4],
+            border_radius: [5.0 / 70.0 * len; 4],
             border_width: 0.0,
             border_color: Color::TRANSPARENT,
         };
 
         let plug = Primitive::Quad {
             bounds: Rectangle {
-                x: b.x + 16.9 / 70.0 * b.width,
-                y: b.y + 2.9 / 70.0 * b.width,
-                width: 11.9 / 70.0 * b.width,
-                height: 2.1 / 70.0 * b.width,
+                x: b.x + 16.9 / 70.0 * len,
+                y: b.y + 2.9 / 70.0 * len,
+                width: 11.9 / 70.0 * len,
+                height: 2.1 / 70.0 * len,
             },
             background: Background::Color(Color::from_rgb8(0x7B, 0x7B, 0x7B)),
             border_radius: [
-                1.0 / 70.0 * b.width,
-                1.0 / 70.0 * b.width,
+                1.0 / 70.0 * len,
+                1.0 / 70.0 * len,
                 0.0,
                 0.0,
                 ],
@@ -195,28 +210,28 @@ where
 
         let glows = vec![
             Rectangle {
-                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * b.width),
-                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
-                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
+                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
+                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * b.width),
-                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
-                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
+                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
+                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * b.width),
-                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * b.width),
-                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
-                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
+                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
+                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * b.width),
-                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * b.width),
-                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
-                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * b.width,
+                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
+                height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             }
         ];
 
@@ -229,7 +244,7 @@ where
             renderer.draw_primitive(Primitive::Quad { 
                 bounds: *glow,
                 background: Background::Color(self.glow[i]),
-                border_radius: [(0.5 + GLOW_D) / 70.0 * b.width; 4],
+                border_radius: [(0.5 + GLOW_D) / 70.0 * len; 4],
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
              });
@@ -243,7 +258,7 @@ where
                 } else {
                     Background::Color(Color::WHITE)
                 },
-                border_radius: [0.5 / 70.0 * b.width; 4],
+                border_radius: [0.5 / 70.0 * len; 4],
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
              });
@@ -251,11 +266,12 @@ where
     }
 }
 
-impl<'a, Message, B, T> From<Macropad> for Element<'a, Message, Renderer<B, T>>
+impl<'a, Message, B, T> From<Macropad<'a, Message>> for Element<'a, Message, Renderer<B, T>>
 where
     B: Backend,
+    Message: 'a,
 {
-    fn from(macropad: Macropad) -> Self {
+    fn from(macropad: Macropad<'a, Message>) -> Self {
         Self::new(macropad)
     }
 }
