@@ -4,7 +4,7 @@ use hidapi::HidDevice;
 use macropad_protocol::{macro_protocol::MacroCommand, data_protocol::{KeyMode, LedEffect}};
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
-use crate::macropad_wrapper;
+use crate::macropad_wrapper::{self, prime_device};
 
 #[derive(Debug, Clone)]
 pub struct MacroFrame {
@@ -166,6 +166,7 @@ pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
 }
 
 pub fn get_macro_pad(device: &HidDevice) -> Result<Macropad, ()> {
+    prime_device(device)?;
     let mut macros = Vec::new();
     let config = get_config(device)?;
     let mut key_configs = Vec::new();

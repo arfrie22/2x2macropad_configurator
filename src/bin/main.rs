@@ -120,15 +120,8 @@ impl Application for Configurator {
                 );
             }
             Message::LedUpdate(_) => {
-                if let State::Connected(_, Page::ModifyLeds(led_runner)) = &mut self.state {
-                    let cfg = LedConfig {
-                        base_color: (255, 0, 128),
-                        effect: macropad_protocol::data_protocol::LedEffect::None,
-                        brightness: 255,
-                        effect_period: 5.0,
-                        effect_offset: 0.0,
-                    };
-                    led_runner.update(&cfg);
+                if let State::Connected(con, Page::ModifyLeds(led_runner)) = &mut self.state {
+                    led_runner.update(&con.get_macropad().led_config);
                 }
             }
         };
@@ -148,7 +141,7 @@ impl Application for Configurator {
     }
 
     fn view(&self) -> Element<Message> {
-        match self.state {
+        match &self.state {
             State::Disconnected => {
                 let message = column![
                     text("Disconnected")
@@ -201,15 +194,7 @@ impl Application for Configurator {
                     .padding(100)
                     .into()
             },
-            State::Connected(_, Page::ModifyLeds(runner)) => {
-                let cfg = LedConfig {
-                    base_color: (255, 0, 128),
-                    effect: macropad_protocol::data_protocol::LedEffect::BreathingSpaced,
-                    brightness: 255,
-                    effect_period: 1.0,
-                    effect_offset: 0.0,
-                };
-
+            State::Connected(con, Page::ModifyLeds(runner)) => {
                 let message = column![
                     text("Main Page")
                         .font(ROBOTO)
@@ -222,7 +207,7 @@ impl Application for Configurator {
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
                     
-                    macropad::macropad_led(runner.get_leds(&cfg))
+                    macropad::macropad_led(runner.get_leds(&con.get_macropad().led_config))
                 ];
 
                 container(message)

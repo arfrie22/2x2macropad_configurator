@@ -8,6 +8,9 @@ use futures::stream::StreamExt;
 use async_std::future;
 
 use std::fmt;
+use std::sync::Arc;
+
+use crate::{macro_parser, macropad_wrapper};
 
 async fn scan_devices(api: &mut HidApi) -> Option<HidDevice> {
     api.refresh_devices().unwrap();
@@ -47,9 +50,10 @@ pub fn connect() -> Subscription<Event> {
                 State::Disconnected(mut api) => {
                     if let Some(d) = scan_devices(&mut api).await {
                         let (sender, receiver) = mpsc::channel(100);
+                        let macropad = Arc::new(macro_parser::get_macro_pad(&d).unwrap());
                             (
-                                Some(Event::Connected(Connection(sender))),
-                                State::Connected(api, d, receiver),
+                                Some(Event::Connected(Connection(sender, macropad.clone()))),
+                                State::Connected(api, d, macropad.clone(), receiver),
                             )
                     } else {
                         tokio::time::sleep(
@@ -60,7 +64,7 @@ pub fn connect() -> Subscription<Event> {
                         (Some(Event::Disconnected), State::Disconnected(api))
                     }
                 }
-                State::Connected(mut api, device, mut input) => {
+                State::Connected(mut api, device, macropad, mut input) => {
                     let command = future::timeout(std::time::Duration::from_secs(1), input.select_next_some()).await;
                     if let Ok(command) = command {
                         match command {
@@ -70,26 +74,26 @@ pub fn connect() -> Subscription<Event> {
                                 if device.write(&data).is_err() {
                                     (None, State::Disconnected(api))
                                 } else {
-                                    (None, State::Sent(api, device, input, data))
+                                    (None, State::Sent(api, device, macropad, input, data))
                                 }
                             }
 
-                            _ => (None, State::Connected(api, device, input)),
+                            _ => (None, State::Connected(api, device, macropad, input)),
                         }
                     } else {
                         if is_connected(&mut api).await {
-                            (None, State::Connected(api, device, input))
+                            (None, State::Connected(api, device, macropad, input))
                         } else {
                             (None, State::Disconnected(api))
                         }
                     }
                 }
-                State::Sent(api, device, input, data) => {
+                State::Sent(api, device, macropad, input, data) => {
                     let mut buf = [0u8; 65];
                     if device.read_timeout(&mut buf, 1000).is_err() {
                         (None, State::Disconnected(api))
                     } else {
-                        (Some(Event::MessageReceived(Message::Data(buf))), State::Connected(api, device, input))
+                        (Some(Event::MessageReceived(Message::Data(buf))), State::Connected(api, device, macropad, input))
                     }
                 }
             }
@@ -104,11 +108,13 @@ enum State {
     Connected(
         hidapi::HidApi,
         hidapi::HidDevice,
+        Arc<macro_parser::Macropad>,
         mpsc::Receiver<Message>,
     ),
     Sent(
         hidapi::HidApi,
         hidapi::HidDevice,
+        Arc<macro_parser::Macropad>,
         mpsc::Receiver<Message>,
         [u8; 65]
     ),
@@ -119,8 +125,8 @@ impl fmt::Debug for State {
         match self {
             State::Uninitialized => write!(f, " Uninitialized"),
             State::Disconnected(_) => write!(f, "Disconnected"),
-            State::Connected(_, _, _) => write!(f, "Connected"),
-            State::Sent(_, _, _, _) => write!(f, "Sent"),
+            State::Connected(_, _, _, _) => write!(f, "Connected"),
+            State::Sent(_, _, _, _, _) => write!(f, "Sent"),
         }
     }
 }
@@ -133,13 +139,17 @@ pub enum Event {
 }
 
 #[derive(Debug, Clone)]
-pub struct Connection(mpsc::Sender<Message>);
+pub struct Connection(mpsc::Sender<Message>, Arc<macro_parser::Macropad>);
 
 impl Connection {
     pub fn send(&mut self, message: Message) {
         self.0
             .try_send(message)
             .expect("Send message to echo server");
+    }
+
+    pub fn get_macropad(&self) -> Arc<macro_parser::Macropad> {
+        self.1.clone()
     }
 }
 
