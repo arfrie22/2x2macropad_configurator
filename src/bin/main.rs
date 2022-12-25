@@ -138,8 +138,13 @@ impl Application for Configurator {
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             hid_manager::connect().map(Message::HidEvent),
-            iced::time::every(Duration::from_millis(16))
-                .map(Message::LedUpdate),
+            match &self.state {
+                State::Connected(_, Page::ModifyLeds(_)) => {
+                iced::time::every(Duration::from_millis(16))
+                    .map(Message::LedUpdate)
+                },
+                _ => Subscription::none(),
+            },
         ])
         // time::every(Duration::from_millis(1000 / self.speed as u64))
         //         .map(Message::Tick)
