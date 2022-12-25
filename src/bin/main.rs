@@ -81,7 +81,8 @@ impl Application for Configurator {
         match message {
             Message::HidMessage(_) => {}
             Message::HidEvent(hid_manager::Event::Connected(connection)) => {
-                self.state = State::Connected(connection, Page::ModifyLeds(LedRunner::default()));
+                // Page::ModifyLeds(LedRunner::default())
+                self.state = State::Connected(connection, Page::MainPage);
             }
             Message::HidEvent(hid_manager::Event::Disconnected) => {
                 self.state = State::Disconnected;
@@ -103,8 +104,11 @@ impl Application for Configurator {
             }
             Message::ButtonMainPage => {
                 self.state = State::Connected(
-                    match &self.state {
-                        State::Connected(connection, _) => connection.clone(),
+                    match &mut self.state {
+                        State::Connected(connection, _) => {
+                            connection.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffect(macropad_protocol::data_protocol::LedEffect::ColorCycle)));
+                            connection.clone()
+                        },
                         _ => unreachable!(),
                     },
                     Page::MainPage,
@@ -112,8 +116,10 @@ impl Application for Configurator {
             }
             Message::ButtonLedPage => {
                 self.state = State::Connected(
-                    match &self.state {
-                        State::Connected(connection, _) => connection.clone(),
+                    match &mut self.state {
+                        State::Connected(connection, _) => {
+                            connection.clone()
+                        },
                         _ => unreachable!(),
                     },
                     Page::ModifyLeds(LedRunner::default()),
