@@ -8,6 +8,15 @@ use crate::macro_parser::KeyConfig;
 pub const CKSUM: Crc<u32> = Crc::<u32>::new(&CRC_32_CKSUM);
 pub const MACRO_SIZE: usize = 4092;
 
+pub const EFFECTS : [LedEffect; 6] = [
+    LedEffect::None,
+    LedEffect::Static,
+    LedEffect::Breathing,
+    LedEffect::BreathingSpaced,
+    LedEffect::ColorCycle,
+    LedEffect::Rainbow,
+];
+
 pub fn send_command(device: &HidDevice, command: [u8; 65]) -> Result<[u8; 64], ()> {
     let mut response = [0u8; 64];
     device.write(&command).unwrap();

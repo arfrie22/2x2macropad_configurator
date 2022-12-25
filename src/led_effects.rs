@@ -110,17 +110,17 @@ impl LedRunner {
     }
 
     pub fn update(&mut self, config: &LedConfig) {
-        self.timer += (1.0/config.effect_period) * ((Instant::now().duration_since(self.last_update).as_micros()) as f32 / 1000.0);
+        if config.effect_period != 0.0 {
+            self.timer += (1.0/config.effect_period) * ((Instant::now().duration_since(self.last_update).as_micros()) as f32 / 1000.0);
 
-        while self.timer > 1000.0 {
-            self.timer -= 1000.0;
+            self.timer = self.timer % 1000.0;
+
+            if self.timer < 0.0 {
+                self.timer += 1000.0;
+            }
+
+            self.last_update = Instant::now();
         }
-
-        while self.timer < 0.0 {
-            self.timer += 1000.0;
-        }
-
-        self.last_update = Instant::now();
     }
 
     pub fn reset(&mut self) {

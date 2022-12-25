@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use iced::{executor, window, Font};
-use iced::widget::{button, column, container, progress_bar, text, Column};
+use iced::widget::{button, column, container, progress_bar, text, Column, pick_list, slider, row};
 use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
@@ -9,6 +9,7 @@ use iced::{
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::{hid_manager, macro_parser, macropad};
+use macropad_protocol::data_protocol::LedEffect;
 
 const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
@@ -50,6 +51,8 @@ pub enum Message {
     ButtonMainPage,
     ButtonLedPage,
     LedUpdate(Instant),
+    LedEffectChanged(LedEffect),  
+    LedPeriodChanged(f32),
 }
 
 impl Application for Configurator {
@@ -106,7 +109,7 @@ impl Application for Configurator {
                 self.state = State::Connected(
                     match &mut self.state {
                         State::Connected(connection, _) => {
-                            connection.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffect(macropad_protocol::data_protocol::LedEffect::ColorCycle)));
+                            // connection.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffect(macropad_protocol::data_protocol::LedEffect::ColorCycle)));
                             connection.clone()
                         },
                         _ => unreachable!(),
@@ -130,6 +133,16 @@ impl Application for Configurator {
                     led_runner.update(&con.get_macropad().lock().unwrap().led_config);
                 }
             }
+            Message::LedEffectChanged(effect) => {
+                if let State::Connected(con, _) = &mut self.state {
+                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffect(effect)));
+                }
+            } 
+            Message::LedPeriodChanged(period) => {
+                if let State::Connected(con, _) = &mut self.state {
+                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0)));
+                }
+            }
         };
 
         Command::none()
@@ -146,9 +159,6 @@ impl Application for Configurator {
                 _ => Subscription::none(),
             },
         ])
-        // time::every(Duration::from_millis(1000 / self.speed as u64))
-        //         .map(Message::Tick)
-        // hid_manager::connect().map(Message::HidEvent)
     }
 
     fn view(&self) -> Element<Message> {
@@ -188,6 +198,7 @@ impl Application for Configurator {
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
                     
+                    button("Modify LEDs").on_press(Message::ButtonLedPage),
                     // macropad::macropad_led([iced::Color::from_rgb(1.0, 0.0, 0.5); 4])
                     macropad::macropad_button().on_press(Message::ButtonPressed)
                         // .width(Length::Fill)
@@ -206,6 +217,8 @@ impl Application for Configurator {
                     .into()
             },
             State::Connected(con, Page::ModifyLeds(runner)) => {
+                let config = con.get_macropad().lock().unwrap().led_config.clone();
+                
                 let message = column![
                     text("Main Page")
                         .font(ROBOTO)
@@ -217,8 +230,18 @@ impl Application for Configurator {
                         .size(30)
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    button("Main Page").on_press(Message::ButtonMainPage),
+                    pick_list(&macropad_configurator::macropad_wrapper::EFFECTS[..], 
+                        Some(config.effect), 
+                        Message::LedEffectChanged),
+
+                    row![
+                        slider(-50.0..=50.0, config.effect_period * 10.0, Message::LedPeriodChanged),
+                        text(format!("Period: {}", config.effect_period))
+                    ],
                     
-                    macropad::macropad_led(runner.get_leds(&con.get_macropad().lock().unwrap().led_config))
+                    
+                    macropad::macropad_led(runner.get_leds(&config))
                 ];
 
                 container(message)
