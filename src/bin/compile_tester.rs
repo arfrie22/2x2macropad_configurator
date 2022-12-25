@@ -28,7 +28,7 @@ fn main() {
             
             macropad_wrapper::set_base_color(&d, (255, 0, 0)).unwrap();
             macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
-            macropad_wrapper::set_effect_period(&d, 5.0).unwrap();
+            macropad_wrapper::set_led_effect_period(&d, 5.0).unwrap();
 
             macropad_wrapper::clear_macro(&d, 0).unwrap();
             macropad_wrapper::set_macro(&d, 0, &macro_data).unwrap();

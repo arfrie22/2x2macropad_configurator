@@ -104,6 +104,18 @@ pub struct Macropad {
     pub led_config: LedConfig,
 }
 
+impl Macropad {
+    pub fn set_macro(&mut self, index: usize, macro_data: Macro) {
+        match index & 0b11 {
+            0 => self.macros[index >> 2].tap = macro_data,
+            1 => self.macros[index >> 2].hold = macro_data,
+            2 => self.macros[index >> 2].double_tap = macro_data,
+            3 => self.macros[index >> 2].tap_hold = macro_data,
+            _ => (),
+        }
+    }
+}
+
 pub fn get_key_config(device: &HidDevice, index: u8) -> Result<KeyConfig, ()> {
     let key_mode =  macropad_wrapper::get_key_mode(device, index)?;
     let keyboard_data = macropad_wrapper::get_keyboard_data(device, index)?;
@@ -152,9 +164,9 @@ pub fn get_config(device: &HidDevice) -> Result<MacroConfig, ()> {
 pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
     let base_color = macropad_wrapper::get_base_color(device)?;
     let effect = macropad_wrapper::get_led_effect(device)?;
-    let brightness = macropad_wrapper::get_brightness(device)?;
-    let effect_period = macropad_wrapper::get_effect_period(device)?;
-    let effect_offset = macropad_wrapper::get_effect_offset(device)?;
+    let brightness = macropad_wrapper::get_led_brightness(device)?;
+    let effect_period = macropad_wrapper::get_led_effect_period(device)?;
+    let effect_offset = macropad_wrapper::get_led_effect_offset(device)?;
 
     Ok(LedConfig {
         base_color,

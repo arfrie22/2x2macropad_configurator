@@ -121,7 +121,7 @@ impl Application for Configurator {
             }
             Message::LedUpdate(_) => {
                 if let State::Connected(con, Page::ModifyLeds(led_runner)) = &mut self.state {
-                    led_runner.update(&con.get_macropad().led_config);
+                    led_runner.update(&con.get_macropad().lock().unwrap().led_config);
                 }
             }
         };
@@ -207,7 +207,7 @@ impl Application for Configurator {
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
                     
-                    macropad::macropad_led(runner.get_leds(&con.get_macropad().led_config))
+                    macropad::macropad_led(runner.get_leds(&con.get_macropad().lock().unwrap().led_config))
                 ];
 
                 container(message)

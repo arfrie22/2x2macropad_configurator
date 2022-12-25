@@ -7,10 +7,10 @@ use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use async_std::future;
 
-use std::fmt;
+use std::{fmt, sync::Mutex};
 use std::sync::Arc;
 
-use crate::{macro_parser, macropad_wrapper};
+use crate::{macro_parser::{self, MacroAction, LedConfig}, macropad_wrapper};
 
 async fn scan_devices(api: &mut HidApi) -> Option<HidDevice> {
     api.refresh_devices().unwrap();
@@ -50,7 +50,7 @@ pub fn connect() -> Subscription<Event> {
                 State::Disconnected(mut api) => {
                     if let Some(d) = scan_devices(&mut api).await {
                         let (sender, receiver) = mpsc::channel(100);
-                        let macropad = Arc::new(macro_parser::get_macro_pad(&d).unwrap());
+                        let macropad = Arc::new(Mutex::new(macro_parser::get_macro_pad(&d).unwrap()));
                             (
                                 Some(Event::Connected(Connection(sender, macropad.clone()))),
                                 State::Connected(api, d, macropad.clone(), receiver),
@@ -61,20 +61,101 @@ pub fn connect() -> Subscription<Event> {
                         )
                         .await;
 
-                        (Some(Event::Disconnected), State::Disconnected(api))
+                        (None, State::Disconnected(api))
                     }
                 }
                 State::Connected(mut api, device, macropad, mut input) => {
                     let command = future::timeout(std::time::Duration::from_secs(1), input.select_next_some()).await;
                     if let Ok(command) = command {
                         match command {
-                            Message::Data(data) => {
-                                let mut data = data;
-                                data[0] = 0;
-                                if device.write(&data).is_err() {
-                                    (None, State::Disconnected(api))
+                            Message::Set(command) => {
+                                let res = match command {
+                                    MacropadCommand::KeyMode(i, mode) => {
+                                        macropad_wrapper::set_key_mode(&device, i, mode).and_then(|_| {
+                                            macropad.lock().unwrap().key_configs[i as usize].key_mode = mode;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::KeyboardData(i, data) => {
+                                        macropad_wrapper::set_keyboard_data(&device, i, data).and_then(|_| {
+                                            macropad.lock().unwrap().key_configs[i as usize].keyboard_data = data;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::ConsumerData(i, data) => {
+                                        macropad_wrapper::set_consumer_data(&device, i, data).and_then(|_| {
+                                            macropad.lock().unwrap().key_configs[i as usize].consumer_data = data;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::KeyColor(i, color) => {
+                                        macropad_wrapper::set_key_color(&device, i, color).and_then(|_| {
+                                            macropad.lock().unwrap().key_configs[i as usize].key_color = color;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::Macro(i, macro_data) => {
+                                        macropad_wrapper::set_macro(&device, i, &macro_data.pack()).and_then(|_| {
+                                            macropad_wrapper::validate_macro(&device, i, &macro_data.pack()).and_then(|_| {
+                                                macropad.lock().unwrap().set_macro(i as usize, macro_data);
+                                                Ok(())
+                                            })
+                                        })
+                                    },
+                                    MacropadCommand::TapSpeed(speed) => {
+                                        macropad_wrapper::set_tap_speed(&device, speed).and_then(|_| {
+                                            macropad.lock().unwrap().config.tap_speed = speed;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::HoldSpeed(speed) => {
+                                        macropad_wrapper::set_hold_speed(&device, speed).and_then(|_| {
+                                            macropad.lock().unwrap().config.hold_speed = speed;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::DefaultDelay(delay) => {
+                                        macropad_wrapper::set_default_delay(&device, delay).and_then(|_| {
+                                            macropad.lock().unwrap().config.default_delay = delay;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::BaseColor(color) => {
+                                        macropad_wrapper::set_base_color(&device, color).and_then(|_| {
+                                            macropad.lock().unwrap().led_config.base_color = color;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::LedEffect(effect) => {
+                                        macropad_wrapper::set_led_effect(&device, effect).and_then(|_| {
+                                            macropad.lock().unwrap().led_config.effect = effect;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::LedBrightness(brightness) => {
+                                        macropad_wrapper::set_led_brightness(&device, brightness).and_then(|_| {
+                                            macropad.lock().unwrap().led_config.brightness = brightness;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::LedEffectPeriod(period) => {
+                                        macropad_wrapper::set_led_effect_period(&device, period).and_then(|_| {
+                                            macropad.lock().unwrap().led_config.effect_period = period;
+                                            Ok(())
+                                        })
+                                    },
+                                    MacropadCommand::LedEffectOffset(offset) => {
+                                        macropad_wrapper::set_led_effect_offset(&device, offset).and_then(|_| {
+                                            macropad.lock().unwrap().led_config.effect_offset = offset;
+                                            Ok(())
+                                        })
+                                    },
+                                };
+                                if res.is_err() {
+                                    drop(device);
+                                    (Some(Event::Disconnected), State::Disconnected(api))
                                 } else {
-                                    (None, State::Sent(api, device, macropad, input, data))
+                                    (Some(Event::MacropadUpdated), State::Connected(api, device, macropad, input))
                                 }
                             }
 
@@ -84,18 +165,18 @@ pub fn connect() -> Subscription<Event> {
                         if is_connected(&mut api).await {
                             (None, State::Connected(api, device, macropad, input))
                         } else {
-                            (None, State::Disconnected(api))
+                            (Some(Event::Disconnected), State::Disconnected(api))
                         }
                     }
                 }
-                State::Sent(api, device, macropad, input, data) => {
-                    let mut buf = [0u8; 65];
-                    if device.read_timeout(&mut buf, 1000).is_err() {
-                        (None, State::Disconnected(api))
-                    } else {
-                        (Some(Event::MessageReceived(Message::Data(buf))), State::Connected(api, device, macropad, input))
-                    }
-                }
+                // State::Sent(api, device, macropad, input, data) => {
+                //     let mut buf = [0u8; 65];
+                //     if device.read_timeout(&mut buf, 1000).is_err() {
+                //         (None, State::Disconnected(api))
+                //     } else {
+                //         (Some(Event::MessageReceived(Message::Data(buf))), State::Connected(api, device, macropad, input))
+                //     }
+                // }
             }
         },
     )
@@ -108,15 +189,8 @@ enum State {
     Connected(
         hidapi::HidApi,
         hidapi::HidDevice,
-        Arc<macro_parser::Macropad>,
+        Arc<Mutex<macro_parser::Macropad>>,
         mpsc::Receiver<Message>,
-    ),
-    Sent(
-        hidapi::HidApi,
-        hidapi::HidDevice,
-        Arc<macro_parser::Macropad>,
-        mpsc::Receiver<Message>,
-        [u8; 65]
     ),
 }
 
@@ -126,7 +200,7 @@ impl fmt::Debug for State {
             State::Uninitialized => write!(f, " Uninitialized"),
             State::Disconnected(_) => write!(f, "Disconnected"),
             State::Connected(_, _, _, _) => write!(f, "Connected"),
-            State::Sent(_, _, _, _, _) => write!(f, "Sent"),
+            // State::Sent(_, _, _, _, _) => write!(f, "Sent"),
         }
     }
 }
@@ -135,11 +209,11 @@ impl fmt::Debug for State {
 pub enum Event {
     Connected(Connection),
     Disconnected,
-    MessageReceived(Message),
+    MacropadUpdated,
 }
 
 #[derive(Debug, Clone)]
-pub struct Connection(mpsc::Sender<Message>, Arc<macro_parser::Macropad>);
+pub struct Connection(mpsc::Sender<Message>, Arc<Mutex<macro_parser::Macropad>>);
 
 impl Connection {
     pub fn send(&mut self, message: Message) {
@@ -148,7 +222,7 @@ impl Connection {
             .expect("Send message to echo server");
     }
 
-    pub fn get_macropad(&self) -> Arc<macro_parser::Macropad> {
+    pub fn get_macropad(&self) -> Arc<Mutex<macro_parser::Macropad>> {
         self.1.clone()
     }
 }
@@ -157,12 +231,29 @@ impl Connection {
 pub enum Message {
     Connected,
     Disconnected,
-    Data([u8; 65]),
+    Set(MacropadCommand),
+}
+
+#[derive(Debug, Clone)]
+pub enum MacropadCommand {
+    KeyMode(u8, macropad_protocol::data_protocol::KeyMode),
+    KeyboardData(u8, usbd_human_interface_device::page::Keyboard),
+    ConsumerData(u8, usbd_human_interface_device::page::Consumer),
+    KeyColor(u8, (u8, u8, u8)),
+    Macro(u8, macro_parser::Macro),
+    TapSpeed(u32),
+    HoldSpeed(u32),
+    DefaultDelay(u32),
+    BaseColor((u8, u8, u8)),
+    LedEffect(macropad_protocol::data_protocol::LedEffect),
+    LedBrightness(u8),
+    LedEffectPeriod(f32),
+    LedEffectOffset(f32),
 }
 
 impl Message {
-    pub fn new(data: [u8; 65]) -> Option<Self> {
-        Some(Self::Data(data))
+    pub fn new(command: MacropadCommand) -> Option<Self> {
+        Some(Self::Set(command))
     }
 
     pub fn connected() -> Self {
@@ -181,7 +272,23 @@ impl fmt::Display for Message {
             Message::Disconnected => {
                 write!(f, "Connection lost... Retrying...")
             }
-            Message::Data(data) => write!(f, "{:?}", data),
+            Message::Set(command) => {
+                match command {
+                    MacropadCommand::KeyMode(i, mode) => write!(f, "Set key mode of {:?} to {:?}", i, mode),
+                    MacropadCommand::KeyboardData(i, data) => write!(f, "Set keyboard data of {:?} to {:?}", i, data),
+                    MacropadCommand::ConsumerData(i, data) => write!(f, "Set consumer data of {:?} to {:?}", i, data),
+                    MacropadCommand::KeyColor(i, color) => write!(f, "Set key color of {:?} to {:?}", i, color),
+                    MacropadCommand::Macro(key, macro_) => write!(f, "Set macro for key {} to {:?}", key, macro_),
+                    MacropadCommand::TapSpeed(speed) => write!(f, "Set tap speed to {}", speed),
+                    MacropadCommand::HoldSpeed(speed) => write!(f, "Set hold speed to {}", speed),
+                    MacropadCommand::DefaultDelay(delay) => write!(f, "Set default delay to {}", delay),
+                    MacropadCommand::BaseColor(color) => write!(f, "Set base color to {:?}", color),
+                    MacropadCommand::LedEffect(effect) => write!(f, "Set led effect to {:?}", effect),
+                    MacropadCommand::LedBrightness(brightness) => write!(f, "Set led brightness to {}", brightness),
+                    MacropadCommand::LedEffectPeriod(period) => write!(f, "Set led effect period to {}", period),
+                    MacropadCommand::LedEffectOffset(offset) => write!(f, "Set led effect offset to {}", offset),
+                }
+            }
         }
     }
 }
