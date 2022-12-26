@@ -28,6 +28,12 @@ osx_url_schemes = ["io.github.arfrie22.macropad_configurator"]
 tokio = { version = "1", features = ["full"] }
 device_query = "1.1.1"
 iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg", "canvas"] }
+iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = [
+    "color_picker",
+    "colors",
+    "tab_bar",
+    "tabs"
+] }
 futures = "0.3.25"
 iced_native = "0.7"
 iced_futures = { version = "0.5.1"}
