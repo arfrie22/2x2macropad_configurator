@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::sync::{Mutex, Arc};
 use std::time::{Duration, Instant};
 
-use iced::{executor, window, Font, Color, Padding};
-use iced::widget::{button, column, container, progress_bar, text, Column, Row, pick_list, slider, row, text_input, Text, Container, Space};
+use iced::subscription::{events_with, events};
+use iced::{executor, window, Font, Color, Padding, Size, alignment};
+use iced::widget::{button, column, container, progress_bar, text, Column, Row, pick_list, slider, row, text_input, Text, Container, Space, pane_grid};
 use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
@@ -10,6 +12,7 @@ use iced::{
 use iced_aw::{color_picker, TabLabel, Tabs, ColorPicker};
 use iced_aw::style::TabBarStyles;
 use iced_native::widget::space;
+use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::{hid_manager, macro_parser, macropad};
@@ -30,6 +33,8 @@ const ICON_FONT: Font = iced::Font::External {
     name: "Icons",
     bytes: include_bytes!("../../assets/fonts/remixicon.ttf"),
 };
+
+const ACTION_DELAY: u64 = 200;
 
 #[derive(Debug, Clone)]
 enum Icon {
@@ -87,6 +92,7 @@ pub enum Message {
     ButtonPressed(usize),
     ReturnToMainPage,
     LedUpdate(Instant),
+    UpdateTick(Instant),
     LedEffectChanged(LedEffect),  
     LedPeriodChanged(f32),
     LedPeriodChangedText(String),
@@ -171,32 +177,37 @@ impl Application for Configurator {
                     }
                 }
             }
-            Message::LedEffectChanged(effect) => {
+            Message::UpdateTick(_) => {
                 if let State::Connected(con, _) = &mut self.state {
-                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffect(effect)));
-                }
-            } 
-            Message::LedPeriodChanged(period) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0)));
+                    self.led_tab.run_actions(con.get_macropad(), con)
                 }
             }
+            Message::LedEffectChanged(effect) => {
+                self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffect(effect));
+            } 
+            Message::LedPeriodChanged(period) => {
+                self.led_tab.period_text = (period / 10.0).to_string();
+                self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0));
+            }
             Message::LedPeriodChangedText(text) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    if let Ok(period) = text.parse::<f32>() {
-                        con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedEffectPeriod(period)));
+                self.led_tab.period_text = text.clone();
+
+                if let Ok(period) = text.parse::<f32>() {
+                    if (-5.0..=5.0).contains(&period) {
+                        self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period));
                     }
                 }
             }
-            Message::LedBrightnessChanged(period) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedBrightness(period as u8)));
-                }
+            Message::LedBrightnessChanged(brightness) => {
+                self.led_tab.brightness_text = brightness.to_string();
+                self.led_tab.queue_action(hid_manager::MacropadCommand::LedBrightness(brightness as u8));
             }
             Message::LedBrightnessChangedText(text) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    if let Ok(brightness) = text.parse::<u8>() {
-                        con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedBrightness(brightness)));
+                self.led_tab.brightness_text = text.clone();
+
+                if let Ok(brightness) = text.parse::<u8>() {
+                    if (0..=255).contains(&brightness) {
+                        self.led_tab.queue_action(hid_manager::MacropadCommand::LedBrightness(brightness));
                     }
                 }
             }
@@ -207,10 +218,8 @@ impl Application for Configurator {
                 self.led_tab.show_picker = false;
             }
             Message::SubmitColor(color) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    let c = color.into_rgba8();
-                    con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::LedBaseColor((c[0], c[1], c[2]))));
-                }
+                let c = color.into_rgba8();
+                self.led_tab.queue_action(hid_manager::MacropadCommand::LedBaseColor((c[0], c[1], c[2])));
                 self.led_tab.show_picker = false;
             }
             Message::TabSelected(i) => {
@@ -272,6 +281,13 @@ impl Application for Configurator {
                     } else {
                         Subscription::none()
                     }
+                },
+                _ => Subscription::none(),
+            },
+            match &self.state {
+                State::Connected(con, _) => {
+                    iced::time::every(Duration::from_millis(50))
+                        .map(Message::UpdateTick)
                 },
                 _ => Subscription::none(),
             },
@@ -341,7 +357,10 @@ impl Application for Configurator {
                     .padding(20)
                     .into()
             },
-            State::Connected(_, Page::RecordMacro(_)) => todo!(),
+            State::Connected(_, Page::RecordMacro(_)) => {
+                // pane_grid()
+                todo!()
+            },
         }
     }
 
@@ -469,20 +488,82 @@ impl Tab for KeyTab {
 
 #[derive(Debug)]
 struct LedTab {
-    macropad: Option<Arc<Mutex<macro_parser::Macropad>>>,
+    config: macro_parser::LedConfig,
     led_runner: LedRunner,
     show_picker: bool,
+    pub period_text: String,
+    pub brightness_text: String,
+    actions: HashMap<macropad_protocol::data_protocol::LedCommand, (bool, Instant, hid_manager::MacropadCommand)>,
 }
 
 impl LedTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>, led_runner: LedRunner) -> Self {
-        Self { macropad: Some(macropad), led_runner, show_picker: false }
+        Self { config: macropad.lock().unwrap().led_config.clone(), led_runner, show_picker: false, period_text: String::from(""), brightness_text: String::from(""), actions: HashMap::new() }
+    }
+
+    fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
+        self.config = macropad.lock().unwrap().led_config.clone();
+    }
+
+    fn run_actions(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>, con: &mut Connection) {
+        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+            if *active && time_to_run.elapsed() > Duration::ZERO {
+                *active = false;
+
+                match action {
+                    hid_manager::MacropadCommand::LedBaseColor(_) => {
+                        macropad.lock().unwrap().led_config.base_color = self.config.base_color;
+                    },
+                    hid_manager::MacropadCommand::LedEffect(_) => {
+                        macropad.lock().unwrap().led_config.effect = self.config.effect;
+                    },
+                    hid_manager::MacropadCommand::LedBrightness(_) => {
+                        macropad.lock().unwrap().led_config.brightness = self.config.brightness;
+                    },
+                    hid_manager::MacropadCommand::LedEffectPeriod(_) => {
+                        macropad.lock().unwrap().led_config.effect_period = self.config.effect_period;
+                    },
+                    hid_manager::MacropadCommand::LedEffectOffset(_) => {
+                        macropad.lock().unwrap().led_config.effect_offset = self.config.effect_offset;
+                    },
+                    _ => unreachable!(),
+                }
+                
+                con.send(hid_manager::Message::Set(action.clone()));
+            }
+        };
+    }
+
+    fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
+        match action {
+            hid_manager::MacropadCommand::LedBaseColor(color) => {
+                self.config.base_color = color;
+                self.actions.insert(macropad_protocol::data_protocol::LedCommand::BaseColor, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
+            },
+            hid_manager::MacropadCommand::LedEffect(effect) => {
+                self.config.effect = effect;
+                self.actions.insert(macropad_protocol::data_protocol::LedCommand::Effect, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
+            },
+            hid_manager::MacropadCommand::LedBrightness(brightness) => {
+                self.config.brightness = brightness;
+                self.actions.insert(macropad_protocol::data_protocol::LedCommand::Brightness, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
+            },
+            hid_manager::MacropadCommand::LedEffectPeriod(period) => {
+                self.config.effect_period = period;
+                self.actions.insert(macropad_protocol::data_protocol::LedCommand::EffectPeriod, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
+            },
+            hid_manager::MacropadCommand::LedEffectOffset(offset) => {
+                self.config.effect_offset = offset;
+                self.actions.insert(macropad_protocol::data_protocol::LedCommand::EffectOffset, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
+            },
+            _ => unreachable!(),
+        }
     }
 }
 
 impl Default for LedTab {
     fn default() -> Self {
-        Self { macropad: None, led_runner: LedRunner::default(), show_picker: false }
+        Self { config: LedConfig::default(), led_runner: LedRunner::default(), show_picker: false, period_text: String::from(""), brightness_text: String::from(""), actions: HashMap::new() }
     }
 }
 
@@ -497,14 +578,7 @@ impl Tab for LedTab {
         TabLabel::IconText(Icon::Light.into(), self.title())
     }
 
-    fn content(&self) -> Element<'_, Self::Message> {
-        let config = {
-            if let Some(macropad) = &self.macropad {
-                macropad.lock().unwrap().led_config.clone()
-            } else {
-                panic!("Macropad not set");
-            }
-        };        
+    fn content(&self) -> Element<'_, Self::Message> {   
         
         let message = column![
             row![
@@ -512,7 +586,7 @@ impl Tab for LedTab {
                     container(column![
                         text("Effect").font(ROBOTO).size(30),
                         pick_list(&macropad_configurator::macropad_wrapper::EFFECTS[..], 
-                            Some(config.effect), 
+                            Some(self.config.effect), 
                             Message::LedEffectChanged),
                     ]).padding(Padding {
                         top: 20,
@@ -524,9 +598,9 @@ impl Tab for LedTab {
                     container(column![
                         text("Period").font(ROBOTO).size(30),
                         row![
-                            slider(-50.0..=50.0, config.effect_period * 10.0, Message::LedPeriodChanged).width(Length::Units(200)),
+                            slider(-50.0..=50.0, self.config.effect_period * 10.0, Message::LedPeriodChanged).width(Length::Units(200)),
                             Space::with_width(Length::Units(20)),
-                            text_input(config.effect_period.to_string().as_str(), config.effect_period.to_string().as_str(), Message::LedPeriodChangedText).font(ROBOTO).width(Length::Units(50)),
+                            text_input(self.config.effect_period.to_string().as_str(), self.period_text.as_str(), Message::LedPeriodChangedText).font(ROBOTO).width(Length::Units(50)),
                         ],
                     ]).padding(Padding {
                         top: 20,
@@ -538,9 +612,9 @@ impl Tab for LedTab {
                     container(column![
                         text("Brightness").font(ROBOTO).size(30),
                         row![
-                            slider(0.0..=255.0, config.brightness as f32, Message::LedBrightnessChanged).width(Length::Units(200)),
+                            slider(0.0..=255.0, self.config.brightness as f32, Message::LedBrightnessChanged).width(Length::Units(200)),
                             Space::with_width(Length::Units(20)),
-                            text_input(config.brightness.to_string().as_str(), config.brightness.to_string().as_str(), Message::LedBrightnessChangedText).font(ROBOTO).width(Length::Units(50)),
+                            text_input(self.config.brightness.to_string().as_str(), self.brightness_text.as_str(), Message::LedBrightnessChangedText).font(ROBOTO).width(Length::Units(50)),
                         ],
                     ]).padding(Padding {
                         top: 20,
@@ -553,7 +627,7 @@ impl Tab for LedTab {
                         text("Base Color").font(ROBOTO).size(30),
                         ColorPicker::new(
                             self.show_picker,
-                            Color::from_rgb8(config.base_color.0, config.base_color.1, config.base_color.2),
+                            Color::from_rgb8(self.config.base_color.0, self.config.base_color.1, self.config.base_color.2),
                             button("Pick Color").on_press(Message::PickColor),
                             Message::CancelColor,
                             Message::SubmitColor,
@@ -566,7 +640,7 @@ impl Tab for LedTab {
                     }),
                 ],
 
-                macropad::macropad_led(self.led_runner.get_leds(&config)),
+                macropad::macropad_led(self.led_runner.get_leds(&self.config)),
             ],
         ];
 
@@ -684,3 +758,153 @@ impl Tab for SettingsTab {
             .into()
     }
 }
+
+// struct Pane {
+//     id: usize,
+//     // pub is_pinned: bool,
+// }
+
+// impl Pane {
+//     fn new(id: usize) -> Self {
+//         Self {
+//             id,
+//             // is_pinned: false,
+//         }
+//     }
+// }
+
+// fn view_content<'a>(
+//     pane: pane_grid::Pane,
+//     total_panes: usize,
+//     is_pinned: bool,
+//     size: Size,
+// ) -> Element<'a, Message> {
+//     let button = |label, message| {
+//         button(
+//             text(label)
+//                 .width(Length::Fill)
+//                 .horizontal_alignment(alignment::Horizontal::Center)
+//                 .size(16),
+//         )
+//         .width(Length::Fill)
+//         .padding(8)
+//         .on_press(message)
+//     };
+
+//     let mut controls = column![
+//         button(
+//             "Split horizontally",
+//             Message::Split(pane_grid::Axis::Horizontal, pane),
+//         ),
+//         button(
+//             "Split vertically",
+//             Message::Split(pane_grid::Axis::Vertical, pane),
+//         )
+//     ]
+//     .spacing(5)
+//     .max_width(150);
+
+//     if total_panes > 1 && !is_pinned {
+//         controls = controls.push(
+//             button("Close", Message::Close(pane))
+//                 .style(theme::Button::Destructive),
+//         );
+//     }
+
+//     let content = column![
+//         text(format!("{}x{}", size.width, size.height)).size(24),
+//         controls,
+//     ]
+//     .width(Length::Fill)
+//     .spacing(10)
+//     .align_items(Alignment::Center);
+
+//     container(scrollable(content))
+//         .width(Length::Fill)
+//         .height(Length::Fill)
+//         .padding(5)
+//         .center_y()
+//         .into()
+// }
+
+// fn view_controls<'a>(
+//     pane: pane_grid::Pane,
+//     total_panes: usize,
+//     is_pinned: bool,
+//     is_maximized: bool,
+// ) -> Element<'a, Message> {
+//     let mut row = row![].spacing(5);
+
+//     if total_panes > 1 {
+//         let toggle = {
+//             let (content, message) = if is_maximized {
+//                 ("Restore", Message::Restore)
+//             } else {
+//                 ("Maximize", Message::Maximize(pane))
+//             };
+//             button(text(content).size(14))
+//                 .style(theme::Button::Secondary)
+//                 .padding(3)
+//                 .on_press(message)
+//         };
+
+//         row = row.push(toggle);
+//     }
+
+//     let mut close = button(text("Close").size(14))
+//         .style(theme::Button::Destructive)
+//         .padding(3);
+
+//     if total_panes > 1 && !is_pinned {
+//         close = close.on_press(Message::Close(pane));
+//     }
+
+//     row.push(close).into()
+// }
+
+// mod style {
+//     use iced::widget::container;
+//     use iced::Theme;
+
+//     pub fn title_bar_active(theme: &Theme) -> container::Appearance {
+//         let palette = theme.extended_palette();
+
+//         container::Appearance {
+//             text_color: Some(palette.background.strong.text),
+//             background: Some(palette.background.strong.color.into()),
+//             ..Default::default()
+//         }
+//     }
+
+//     pub fn title_bar_focused(theme: &Theme) -> container::Appearance {
+//         let palette = theme.extended_palette();
+
+//         container::Appearance {
+//             text_color: Some(palette.primary.strong.text),
+//             background: Some(palette.primary.strong.color.into()),
+//             ..Default::default()
+//         }
+//     }
+
+//     pub fn pane_active(theme: &Theme) -> container::Appearance {
+//         let palette = theme.extended_palette();
+
+//         container::Appearance {
+//             background: Some(palette.background.weak.color.into()),
+//             border_width: 2.0,
+//             border_color: palette.background.strong.color,
+//             ..Default::default()
+//         }
+//     }
+
+//     pub fn pane_focused(theme: &Theme) -> container::Appearance {
+//         let palette = theme.extended_palette();
+
+//         container::Appearance {
+//             background: Some(palette.background.weak.color.into()),
+//             border_width: 2.0,
+//             border_color: palette.primary.strong.color,
+//             ..Default::default()
+//         }
+//     }
+// }

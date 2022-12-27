@@ -79,6 +79,17 @@ pub struct KeyConfig {
     pub key_color: (u8, u8, u8),
 }
 
+impl Default for KeyConfig {
+    fn default() -> Self {
+        Self {
+            key_mode: KeyMode::MacroMode,
+            keyboard_data: Keyboard::NoEventIndicated,
+            consumer_data: Consumer::Unassigned,
+            key_color: (0, 0, 0),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LedConfig {
     pub base_color: (u8, u8, u8),
@@ -86,6 +97,18 @@ pub struct LedConfig {
     pub brightness: u8,
     pub effect_period: f32,
     pub effect_offset: f32,
+}
+
+impl Default for LedConfig {
+    fn default() -> Self {
+        Self {
+            base_color: (0, 0, 0),
+            effect: LedEffect::None,
+            brightness: 0xA0,
+            effect_period: 1.0,
+            effect_offset: 0.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
