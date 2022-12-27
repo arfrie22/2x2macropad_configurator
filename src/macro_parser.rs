@@ -162,7 +162,7 @@ pub fn get_config(device: &HidDevice) -> Result<MacroConfig, ()> {
 }
 
 pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
-    let base_color = macropad_wrapper::get_base_color(device)?;
+    let base_color = macropad_wrapper::get_led_base_color(device)?;
     let effect = macropad_wrapper::get_led_effect(device)?;
     let brightness = macropad_wrapper::get_led_brightness(device)?;
     let effect_period = macropad_wrapper::get_led_effect_period(device)?;

@@ -120,8 +120,8 @@ pub fn connect() -> Subscription<Event> {
                                             Ok(())
                                         })
                                     },
-                                    MacropadCommand::BaseColor(color) => {
-                                        macropad_wrapper::set_base_color(&device, color).and_then(|_| {
+                                    MacropadCommand::LedBaseColor(color) => {
+                                        macropad_wrapper::set_led_base_color(&device, color).and_then(|_| {
                                             macropad.lock().unwrap().led_config.base_color = color;
                                             Ok(())
                                         })
@@ -169,14 +169,6 @@ pub fn connect() -> Subscription<Event> {
                         }
                     }
                 }
-                // State::Sent(api, device, macropad, input, data) => {
-                //     let mut buf = [0u8; 65];
-                //     if device.read_timeout(&mut buf, 1000).is_err() {
-                //         (None, State::Disconnected(api))
-                //     } else {
-                //         (Some(Event::MessageReceived(Message::Data(buf))), State::Connected(api, device, macropad, input))
-                //     }
-                // }
             }
         },
     )
@@ -244,7 +236,7 @@ pub enum MacropadCommand {
     TapSpeed(u32),
     HoldSpeed(u32),
     DefaultDelay(u32),
-    BaseColor((u8, u8, u8)),
+    LedBaseColor((u8, u8, u8)),
     LedEffect(macropad_protocol::data_protocol::LedEffect),
     LedBrightness(u8),
     LedEffectPeriod(f32),
@@ -282,7 +274,7 @@ impl fmt::Display for Message {
                     MacropadCommand::TapSpeed(speed) => write!(f, "Set tap speed to {}", speed),
                     MacropadCommand::HoldSpeed(speed) => write!(f, "Set hold speed to {}", speed),
                     MacropadCommand::DefaultDelay(delay) => write!(f, "Set default delay to {}", delay),
-                    MacropadCommand::BaseColor(color) => write!(f, "Set base color to {:?}", color),
+                    MacropadCommand::LedBaseColor(color) => write!(f, "Set led base color to {:?}", color),
                     MacropadCommand::LedEffect(effect) => write!(f, "Set led effect to {:?}", effect),
                     MacropadCommand::LedBrightness(brightness) => write!(f, "Set led brightness to {}", brightness),
                     MacropadCommand::LedEffectPeriod(period) => write!(f, "Set led effect period to {}", period),

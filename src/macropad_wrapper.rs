@@ -303,7 +303,7 @@ pub fn set_default_delay(device: &HidDevice, delay: u32) -> Result<(), ()> {
     }
 }
 
-pub fn get_base_color(device: &HidDevice) -> Result<(u8, u8, u8), ()> {
+pub fn get_led_base_color(device: &HidDevice) -> Result<(u8, u8, u8), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::GetLed as u8;
     data[2] = LedCommand::BaseColor as u8;
@@ -316,7 +316,7 @@ pub fn get_base_color(device: &HidDevice) -> Result<(u8, u8, u8), ()> {
     }
 }
 
-pub fn set_base_color(device: &HidDevice, color: (u8, u8, u8)) -> Result<(), ()> {
+pub fn set_led_base_color(device: &HidDevice, color: (u8, u8, u8)) -> Result<(), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::SetLed as u8;
     data[2] = LedCommand::BaseColor as u8;

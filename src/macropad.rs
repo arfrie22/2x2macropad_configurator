@@ -66,29 +66,30 @@ impl<'a, Message> Macropad<'a, Message> {
 
     fn get_keys(&self, b: &Rectangle) -> Vec<Rectangle<f32>> {
         let len = b.width.min(b.height);
+        let offset = 30.0 / 70.0 * len;
 
         vec![
             Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * len),
-                y: b.y + ((35.0 - 16.525) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 - 16.525) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 - 16.525) / 70.0 * len),
                 width: 14.0 / 70.0 * len,
                 height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 - 16.525) / 70.0 * len),
-                y: b.y + ((35.0 + 2.525) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 - 16.525) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 + 2.525) / 70.0 * len),
                 width: 14.0 / 70.0 * len,
                 height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * len),
-                y: b.y + ((35.0 + 2.525) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 + 2.525) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 + 2.525) / 70.0 * len),
                 width: 14.0 / 70.0 * len,
                 height: 14.0 / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525) / 70.0 * len),
-                y: b.y + ((35.0 - 16.525) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 + 2.525) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 - 16.525) / 70.0 * len),
                 width: 14.0 / 70.0 * len,
                 height: 14.0 / 70.0 * len,
             }
@@ -101,17 +102,18 @@ where
     B: Backend,
 {
     fn width(&self) -> Length {
-        Length::Units(10)
+        Length::Fill
     }
 
     fn height(&self) -> Length {
-        Length::Units(10)
+        Length::Fill
     }
 
     fn layout(&self, _renderer: &Renderer<B, T>, limits: &layout::Limits) -> layout::Node {
-        let size = limits.width(Length::Fill).resolve(Size::ZERO);
+        let size_w = limits.width(Length::Fill).resolve(Size::ZERO).width;
+        let size_h = limits.height(Length::Fill).resolve(Size::ZERO).height;
 
-        layout::Node::new(Size::new(size.width, size.width))
+        layout::Node::new(Size::new(size_w, size_h))
     }
 
     fn on_event(
@@ -125,15 +127,17 @@ where
             shell: &mut iced_native::Shell<'_, Message>,
         ) -> iced::event::Status {
         if self.interactable {
-            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
-                for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
-                    if key.contains(cursor_position) {
-                        self.selected = Some(i);
-                        return iced::event::Status::Captured;
+            if !self.clicked {
+                if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
+                    for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
+                        if key.contains(cursor_position) {
+                            self.selected = Some(i);
+                            return iced::event::Status::Captured;
+                        }
                     }
+                    self.selected = None;
+                    self.clicked = false;
                 }
-                self.selected = None;
-                self.clicked = false;
             }
 
             if let Some(i) = self.selected {
@@ -144,8 +148,10 @@ where
                     }
                     iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
                         if self.clicked {
-                            println!("Key {} clicked", i);
-                            shell.publish(self.message.as_ref().unwrap()(i));
+                            if self.get_keys(&layout.bounds())[i].contains(cursor_position) {
+                                shell.publish(self.message.as_ref().unwrap()(i));
+                            }
+                            
                             self.clicked = false;
                             return iced::event::Status::Captured;
                         }
@@ -156,6 +162,33 @@ where
         }
 
         iced::event::Status::Ignored
+    }
+
+    fn mouse_interaction(
+            &self,
+            _state: &widget::Tree,
+            layout: Layout<'_>,
+            cursor_position: Point,
+            _viewport: &Rectangle,
+            _renderer: &Renderer<B, T>,
+        ) -> iced_native::mouse::Interaction {
+            if self.interactable {
+                for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
+                    if key.contains(cursor_position) {
+                        if let Some(selected) = self.selected {
+                            if selected == i {
+                                return iced::mouse::Interaction::Pointer;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            return iced::mouse::Interaction::Pointer;
+                        }
+                    }
+                }
+            }
+            
+            iced::mouse::Interaction::default()
     }
 
     fn draw(
@@ -174,11 +207,12 @@ where
         let b = layout.bounds();
 
         let len = b.width.min(b.height);
+        let offset = 30.0 / 70.0 * len;
 
         let board = Primitive::Quad {
             bounds: Rectangle {
-                x: b.x + 5.0 / 70.0 * len,
-                y: b.y + 5.0 / 70.0 * len,
+                x: b.center_x() - offset + 5.0 / 70.0 * len,
+                y: b.center_y() - offset + 5.0 / 70.0 * len,
                 width: 60.0 / 70.0 * len,
                 height: 60.0 / 70.0 * len,
             },
@@ -190,8 +224,8 @@ where
 
         let plug = Primitive::Quad {
             bounds: Rectangle {
-                x: b.x + 16.9 / 70.0 * len,
-                y: b.y + 2.9 / 70.0 * len,
+                x: b.center_x() - offset + 16.9 / 70.0 * len,
+                y: b.center_y() - offset + 2.9 / 70.0 * len,
                 width: 11.9 / 70.0 * len,
                 height: 2.1 / 70.0 * len,
             },
@@ -210,26 +244,26 @@ where
 
         let glows = vec![
             Rectangle {
-                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
-                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
                 width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
                 height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
-                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
                 width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
                 height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
-                y: b.y + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
                 width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
                 height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             },
             Rectangle {
-                x: b.x + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
-                y: b.y + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
+                x: b.center_x() - offset + ((35.0 + 2.525 - GLOW_D) / 70.0 * len),
+                y: b.center_y() - offset + ((35.0 - 16.525 - GLOW_D) / 70.0 * len),
                 width: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
                 height: (14.0 + (GLOW_D * 2.0)) / 70.0 * len,
             }
