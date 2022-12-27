@@ -1,23 +1,23 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use iced::subscription::{events_with, events};
-use iced::{executor, window, Font, Color, Padding, Size, alignment};
-use iced::widget::{button, column, container, progress_bar, text, Column, Row, pick_list, slider, row, text_input, Text, Container, Space, pane_grid};
-use iced::{
-    Alignment, Application, Command, Element, Length, Settings, Subscription,
-    Theme,
+use iced::subscription::{events, events_with};
+use iced::widget::{
+    button, column, container, pane_grid, pick_list, progress_bar, row, slider, text, text_input,
+    Column, Container, Row, Space, Text,
 };
-use iced_aw::{color_picker, TabLabel, Tabs, ColorPicker};
+use iced::{alignment, executor, window, Color, Font, Padding, Size};
+use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
 use iced_aw::style::TabBarStyles;
+use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs};
 use iced_native::widget::space;
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::{hid_manager, macro_parser, macropad};
 use macropad_protocol::data_protocol::LedEffect;
-use num_enum::{IntoPrimitive, FromPrimitive};
+use num_enum::{FromPrimitive, IntoPrimitive};
 
 const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
@@ -93,7 +93,7 @@ pub enum Message {
     ReturnToMainPage,
     LedUpdate(Instant),
     UpdateTick(Instant),
-    LedEffectChanged(LedEffect),  
+    LedEffectChanged(LedEffect),
     LedPeriodChanged(f32),
     LedPeriodChangedText(String),
     LedBrightnessChanged(f32),
@@ -173,87 +173,134 @@ impl Application for Configurator {
             Message::LedUpdate(_) => {
                 if let State::Connected(con, Page::MainPage(id)) = &mut self.state {
                     if TabId::from(*id) == TabId::ModifyLed {
-                        self.led_tab.led_runner.update(&con.get_macropad().lock().unwrap().led_config);
+                        self.led_tab
+                            .led_runner
+                            .update(&con.get_macropad().lock().unwrap().led_config);
                     }
                 }
             }
             Message::UpdateTick(_) => {
                 if let State::Connected(con, _) = &mut self.state {
-                    self.led_tab.run_actions(con.get_macropad(), con)
+                    self.led_tab.run_actions(con.get_macropad(), con);
+                    self.settings_tab.run_actions(con.get_macropad(), con);
                 }
             }
             Message::LedEffectChanged(effect) => {
-                self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffect(effect));
-            } 
+                self.led_tab
+                    .queue_action(hid_manager::MacropadCommand::LedEffect(effect));
+            }
             Message::LedPeriodChanged(period) => {
                 self.led_tab.period_text = (period / 10.0).to_string();
-                self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0));
+                self.led_tab
+                    .queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0));
             }
             Message::LedPeriodChangedText(text) => {
                 self.led_tab.period_text = text.clone();
 
                 if let Ok(period) = text.parse::<f32>() {
                     if (-5.0..=5.0).contains(&period) {
-                        self.led_tab.queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period));
+                        self.led_tab
+                            .queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period));
                     }
                 }
             }
             Message::LedBrightnessChanged(brightness) => {
                 self.led_tab.brightness_text = brightness.to_string();
-                self.led_tab.queue_action(hid_manager::MacropadCommand::LedBrightness(brightness as u8));
+                self.led_tab
+                    .queue_action(hid_manager::MacropadCommand::LedBrightness(
+                        brightness as u8,
+                    ));
             }
             Message::LedBrightnessChangedText(text) => {
                 self.led_tab.brightness_text = text.clone();
 
                 if let Ok(brightness) = text.parse::<u8>() {
                     if (0..=255).contains(&brightness) {
-                        self.led_tab.queue_action(hid_manager::MacropadCommand::LedBrightness(brightness));
+                        self.led_tab
+                            .queue_action(hid_manager::MacropadCommand::LedBrightness(brightness));
                     }
                 }
             }
             Message::PickColor => {
                 self.led_tab.show_picker = true;
-            } 
+            }
             Message::CancelColor => {
                 self.led_tab.show_picker = false;
             }
             Message::SubmitColor(color) => {
                 let c = color.into_rgba8();
-                self.led_tab.queue_action(hid_manager::MacropadCommand::LedBaseColor((c[0], c[1], c[2])));
+                self.led_tab
+                    .queue_action(hid_manager::MacropadCommand::LedBaseColor((
+                        c[0], c[1], c[2],
+                    )));
                 self.led_tab.show_picker = false;
             }
             Message::TabSelected(i) => {
-                if TabId::from(i) == TabId::ModifyLed {
-                    self.led_tab.led_runner.reset();
-                }
                 self.state = State::Connected(
                     match &mut self.state {
                         State::Connected(connection, _) => {
+                            match TabId::from(i) {
+                                TabId::MainPage => {}
+                                TabId::ModifyLed => {
+                                    self.led_tab.led_runner.reset();
+                                    self.led_tab.update_config(connection.get_macropad());
+                                }
+                                TabId::ModyifySettings => {
+                                    self.settings_tab.update_config(connection.get_macropad());
+                                }
+                            }
                             connection.clone()
-                        },
+                        }
                         _ => unreachable!(),
                     },
                     Page::MainPage(i),
                 );
             }
             Message::PressTimeChangedText(text) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    if let Ok(press_time) = text.parse::<u32>() {
-                        con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::TapSpeed(press_time * 1000)));
+                self.settings_tab.press_time_text = text.clone();
+
+                if let Ok(speed) = text.parse::<f32>() {
+                    let speed = (speed * 1000.0).trunc() / 1000.0;
+                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
+                        if speed != speed.trunc() && !text.ends_with('0') {
+                            self.settings_tab.press_time_text = speed.to_string();
+                        }
+                        self.settings_tab
+                            .queue_action(hid_manager::MacropadCommand::TapSpeed(
+                                (speed * 1000.0) as u32,
+                            ));
                     }
                 }
             }
             Message::HoldTimeChangedText(text) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    if let Ok(hold_time) = text.parse::<u32>() {
-                        con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::HoldSpeed(hold_time * 1000)));
+                self.settings_tab.hold_time_text = text.clone();
+
+                if let Ok(speed) = text.parse::<f32>() {
+                    let speed = (speed * 1000.0).trunc() / 1000.0;
+                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
+                        if speed != speed.trunc() && !text.ends_with('0') {
+                            self.settings_tab.hold_time_text = speed.to_string();
+                        }
+                        self.settings_tab
+                            .queue_action(hid_manager::MacropadCommand::HoldSpeed(
+                                (speed * 1000.0) as u32,
+                            ));
                     }
                 }
             }
             Message::DefaultDelayChangedText(text) => {
-                if let State::Connected(con, _) = &mut self.state {
-                    if let Ok(default_delay) = text.parse::<u32>() {
-                        con.send(hid_manager::Message::Set(hid_manager::MacropadCommand::DefaultDelay(default_delay * 1000)));
+                self.settings_tab.default_delay_text = text.clone();
+
+                if let Ok(speed) = text.parse::<f32>() {
+                    let speed = (speed * 1000.0).trunc() / 1000.0;
+                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
+                        if speed != speed.trunc() && !text.ends_with('0') {
+                            self.settings_tab.default_delay_text = speed.to_string();
+                        }
+                        self.settings_tab
+                            .queue_action(hid_manager::MacropadCommand::DefaultDelay(
+                                (speed * 1000.0) as u32,
+                            ));
                     }
                 }
             }
@@ -276,19 +323,17 @@ impl Application for Configurator {
             match &self.state {
                 State::Connected(_, Page::MainPage(i)) => {
                     if TabId::from(*i) == TabId::ModifyLed {
-                        iced::time::every(Duration::from_millis(16))
-                            .map(Message::LedUpdate)
+                        iced::time::every(Duration::from_millis(16)).map(Message::LedUpdate)
                     } else {
                         Subscription::none()
                     }
-                },
+                }
                 _ => Subscription::none(),
             },
             match &self.state {
                 State::Connected(con, _) => {
-                    iced::time::every(Duration::from_millis(50))
-                        .map(Message::UpdateTick)
-                },
+                    iced::time::every(Duration::from_millis(50)).map(Message::UpdateTick)
+                }
                 _ => Subscription::none(),
             },
         ])
@@ -317,19 +362,17 @@ impl Application for Configurator {
                     .center_y()
                     .padding(20)
                     .into()
-            },
-            State::Connected(con, Page::MainPage(i)) => {
-                Tabs::new(*i, Message::TabSelected)
-                    .push(self.key_tab.tab_label(), self.key_tab.view())
-                    .push(self.led_tab.tab_label(), self.led_tab.view())
-                    .push(self.settings_tab.tab_label(), self.settings_tab.view())
-                    .tab_bar_style(TabBarStyles::Purple)
-                    .icon_font(ICON_FONT)
-                    .tab_bar_position(iced_aw::TabBarPosition::Bottom)
-                    .text_font(ROBOTO)
-                    .text_size(20)
-                    .into()
-            },
+            }
+            State::Connected(con, Page::MainPage(i)) => Tabs::new(*i, Message::TabSelected)
+                .push(self.key_tab.tab_label(), self.key_tab.view())
+                .push(self.led_tab.tab_label(), self.led_tab.view())
+                .push(self.settings_tab.tab_label(), self.settings_tab.view())
+                .tab_bar_style(TabBarStyles::Purple)
+                .icon_font(ICON_FONT)
+                .tab_bar_position(iced_aw::TabBarPosition::Bottom)
+                .text_font(ROBOTO)
+                .text_size(20)
+                .into(),
             State::Connected(_, Page::ModifyKey(_)) => {
                 let message = column![
                     text("Modify Key")
@@ -356,11 +399,11 @@ impl Application for Configurator {
                     .center_y()
                     .padding(20)
                     .into()
-            },
+            }
             State::Connected(_, Page::RecordMacro(_)) => {
                 // pane_grid()
                 todo!()
-            },
+            }
         }
     }
 
@@ -379,16 +422,7 @@ enum Page {
 
 #[repr(usize)]
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    IntoPrimitive,
-    FromPrimitive,
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, IntoPrimitive, FromPrimitive,
 )]
 enum TabId {
     #[num_enum(default)]
@@ -402,7 +436,6 @@ enum State {
     Disconnected,
     Connected(hid_manager::Connection, Page),
 }
-
 
 trait Tab {
     type Message;
@@ -429,7 +462,6 @@ trait Tab {
     fn content(&self) -> Element<'_, Self::Message>;
 }
 
-
 #[derive(Debug)]
 struct KeyTab {
     macropad: Option<Arc<Mutex<macro_parser::Macropad>>>,
@@ -437,7 +469,9 @@ struct KeyTab {
 
 impl KeyTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>) -> Self {
-        Self { macropad: Some(macropad) }
+        Self {
+            macropad: Some(macropad),
+        }
     }
 }
 
@@ -491,14 +525,26 @@ struct LedTab {
     config: macro_parser::LedConfig,
     led_runner: LedRunner,
     show_picker: bool,
-    pub period_text: String,
-    pub brightness_text: String,
-    actions: HashMap<macropad_protocol::data_protocol::LedCommand, (bool, Instant, hid_manager::MacropadCommand)>,
+    period_text: String,
+    brightness_text: String,
+    actions: HashMap<
+        macropad_protocol::data_protocol::LedCommand,
+        (bool, Instant, hid_manager::MacropadCommand),
+    >,
 }
 
 impl LedTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>, led_runner: LedRunner) -> Self {
-        Self { config: macropad.lock().unwrap().led_config.clone(), led_runner, show_picker: false, period_text: String::from(""), brightness_text: String::from(""), actions: HashMap::new() }
+        let config = macropad.lock().unwrap().led_config.clone();
+
+        Self {
+            config: config.clone(),
+            led_runner,
+            show_picker: false,
+            period_text: config.effect_period.to_string(),
+            brightness_text: config.brightness.to_string(),
+            actions: HashMap::new(),
+        }
     }
 
     fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
@@ -513,49 +559,86 @@ impl LedTab {
                 match action {
                     hid_manager::MacropadCommand::LedBaseColor(_) => {
                         macropad.lock().unwrap().led_config.base_color = self.config.base_color;
-                    },
+                    }
                     hid_manager::MacropadCommand::LedEffect(_) => {
                         macropad.lock().unwrap().led_config.effect = self.config.effect;
-                    },
+                    }
                     hid_manager::MacropadCommand::LedBrightness(_) => {
                         macropad.lock().unwrap().led_config.brightness = self.config.brightness;
-                    },
+                    }
                     hid_manager::MacropadCommand::LedEffectPeriod(_) => {
-                        macropad.lock().unwrap().led_config.effect_period = self.config.effect_period;
-                    },
+                        macropad.lock().unwrap().led_config.effect_period =
+                            self.config.effect_period;
+                    }
                     hid_manager::MacropadCommand::LedEffectOffset(_) => {
-                        macropad.lock().unwrap().led_config.effect_offset = self.config.effect_offset;
-                    },
+                        macropad.lock().unwrap().led_config.effect_offset =
+                            self.config.effect_offset;
+                    }
                     _ => unreachable!(),
                 }
-                
+
                 con.send(hid_manager::Message::Set(action.clone()));
             }
-        };
+        }
     }
 
     fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
         match action {
             hid_manager::MacropadCommand::LedBaseColor(color) => {
                 self.config.base_color = color;
-                self.actions.insert(macropad_protocol::data_protocol::LedCommand::BaseColor, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
-            },
+                self.actions.insert(
+                    macropad_protocol::data_protocol::LedCommand::BaseColor,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
             hid_manager::MacropadCommand::LedEffect(effect) => {
                 self.config.effect = effect;
-                self.actions.insert(macropad_protocol::data_protocol::LedCommand::Effect, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
-            },
+                self.actions.insert(
+                    macropad_protocol::data_protocol::LedCommand::Effect,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
             hid_manager::MacropadCommand::LedBrightness(brightness) => {
                 self.config.brightness = brightness;
-                self.actions.insert(macropad_protocol::data_protocol::LedCommand::Brightness, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
-            },
+                self.actions.insert(
+                    macropad_protocol::data_protocol::LedCommand::Brightness,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
             hid_manager::MacropadCommand::LedEffectPeriod(period) => {
                 self.config.effect_period = period;
-                self.actions.insert(macropad_protocol::data_protocol::LedCommand::EffectPeriod, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
-            },
+                self.actions.insert(
+                    macropad_protocol::data_protocol::LedCommand::EffectPeriod,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
             hid_manager::MacropadCommand::LedEffectOffset(offset) => {
                 self.config.effect_offset = offset;
-                self.actions.insert(macropad_protocol::data_protocol::LedCommand::EffectOffset, (true, Instant::now() + Duration::from_millis(ACTION_DELAY), action));
-            },
+                self.actions.insert(
+                    macropad_protocol::data_protocol::LedCommand::EffectOffset,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
             _ => unreachable!(),
         }
     }
@@ -563,7 +646,14 @@ impl LedTab {
 
 impl Default for LedTab {
     fn default() -> Self {
-        Self { config: LedConfig::default(), led_runner: LedRunner::default(), show_picker: false, period_text: String::from(""), brightness_text: String::from(""), actions: HashMap::new() }
+        Self {
+            config: LedConfig::default(),
+            led_runner: LedRunner::default(),
+            show_picker: false,
+            period_text: String::from(""),
+            brightness_text: String::from(""),
+            actions: HashMap::new(),
+        }
     }
 }
 
@@ -578,71 +668,96 @@ impl Tab for LedTab {
         TabLabel::IconText(Icon::Light.into(), self.title())
     }
 
-    fn content(&self) -> Element<'_, Self::Message> {   
-        
-        let message = column![
-            row![
-                column![
-                    container(column![
-                        text("Effect").font(ROBOTO).size(30),
-                        pick_list(&macropad_configurator::macropad_wrapper::EFFECTS[..], 
-                            Some(self.config.effect), 
-                            Message::LedEffectChanged),
-                    ]).padding(Padding {
-                        top: 20,
-                        right: 0,
-                        bottom: 20,
-                        left: 0,
-                    }),
-                    
-                    container(column![
-                        text("Period").font(ROBOTO).size(30),
-                        row![
-                            slider(-50.0..=50.0, self.config.effect_period * 10.0, Message::LedPeriodChanged).width(Length::Units(200)),
-                            Space::with_width(Length::Units(20)),
-                            text_input(self.config.effect_period.to_string().as_str(), self.period_text.as_str(), Message::LedPeriodChangedText).font(ROBOTO).width(Length::Units(50)),
-                        ],
-                    ]).padding(Padding {
-                        top: 20,
-                        right: 0,
-                        bottom: 20,
-                        left: 0,
-                    }),
-
-                    container(column![
-                        text("Brightness").font(ROBOTO).size(30),
-                        row![
-                            slider(0.0..=255.0, self.config.brightness as f32, Message::LedBrightnessChanged).width(Length::Units(200)),
-                            Space::with_width(Length::Units(20)),
-                            text_input(self.config.brightness.to_string().as_str(), self.brightness_text.as_str(), Message::LedBrightnessChangedText).font(ROBOTO).width(Length::Units(50)),
-                        ],
-                    ]).padding(Padding {
-                        top: 20,
-                        right: 0,
-                        bottom: 20,
-                        left: 0,
-                    }),
-                    
-                    container(column![
-                        text("Base Color").font(ROBOTO).size(30),
-                        ColorPicker::new(
-                            self.show_picker,
-                            Color::from_rgb8(self.config.base_color.0, self.config.base_color.1, self.config.base_color.2),
-                            button("Pick Color").on_press(Message::PickColor),
-                            Message::CancelColor,
-                            Message::SubmitColor,
+    fn content(&self) -> Element<'_, Self::Message> {
+        let message = column![row![
+            column![
+                container(column![
+                    text("Effect").font(ROBOTO).size(30),
+                    pick_list(
+                        &macropad_configurator::macropad_wrapper::EFFECTS[..],
+                        Some(self.config.effect),
+                        Message::LedEffectChanged
+                    ),
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+                container(column![
+                    text("Period").font(ROBOTO).size(30),
+                    row![
+                        slider(
+                            -50.0..=50.0,
+                            self.config.effect_period * 10.0,
+                            Message::LedPeriodChanged
                         )
-                    ]).padding(Padding {
-                        top: 20,
-                        right: 0,
-                        bottom: 20,
-                        left: 0,
-                    }),
-                ],
-
-                macropad::macropad_led(self.led_runner.get_leds(&self.config)),
+                        .width(Length::Units(200)),
+                        Space::with_width(Length::Units(20)),
+                        text_input(
+                            self.config.effect_period.to_string().as_str(),
+                            self.period_text.as_str(),
+                            Message::LedPeriodChangedText
+                        )
+                        .font(ROBOTO)
+                        .width(Length::Units(50)),
+                    ],
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+                container(column![
+                    text("Brightness").font(ROBOTO).size(30),
+                    row![
+                        slider(
+                            0.0..=255.0,
+                            self.config.brightness as f32,
+                            Message::LedBrightnessChanged
+                        )
+                        .width(Length::Units(200)),
+                        Space::with_width(Length::Units(20)),
+                        text_input(
+                            self.config.brightness.to_string().as_str(),
+                            self.brightness_text.as_str(),
+                            Message::LedBrightnessChangedText
+                        )
+                        .font(ROBOTO)
+                        .width(Length::Units(50)),
+                    ],
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+                container(column![
+                    text("Base Color").font(ROBOTO).size(30),
+                    ColorPicker::new(
+                        self.show_picker,
+                        Color::from_rgb8(
+                            self.config.base_color.0,
+                            self.config.base_color.1,
+                            self.config.base_color.2
+                        ),
+                        button("Pick Color").on_press(Message::PickColor),
+                        Message::CancelColor,
+                        Message::SubmitColor,
+                    )
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
             ],
-        ];
+            macropad::macropad_led(self.led_runner.get_leds(&self.config)),
+        ],];
 
         container(message)
             .width(Length::Fill)
@@ -656,28 +771,111 @@ impl Tab for LedTab {
 
 #[derive(Debug)]
 struct SettingsTab {
-    macropad: Option<Arc<Mutex<macro_parser::Macropad>>>,
+    config: macro_parser::MacroConfig,
     theme: Theme,
+    press_time_text: String,
+    hold_time_text: String,
+    default_delay_text: String,
+    actions: HashMap<
+        macropad_protocol::data_protocol::ConfigElements,
+        (bool, Instant, hid_manager::MacropadCommand),
+    >,
 }
 
 impl SettingsTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>, theme: Theme) -> Self {
-        Self { 
-            macropad: Some(macropad),
-            theme
+        let config = macropad.lock().unwrap().config.clone();
+
+        Self {
+            config: config.clone(),
+            theme,
+            press_time_text: (config.tap_speed / 1000).to_string(),
+            hold_time_text: (config.hold_speed / 1000).to_string(),
+            default_delay_text: (config.default_delay / 1000).to_string(),
+            actions: HashMap::new(),
+        }
+    }
+
+    fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
+        self.config = macropad.lock().unwrap().config.clone();
+    }
+
+    fn run_actions(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>, con: &mut Connection) {
+        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+            if *active && time_to_run.elapsed() > Duration::ZERO {
+                *active = false;
+
+                match action {
+                    hid_manager::MacropadCommand::TapSpeed(_) => {
+                        macropad.lock().unwrap().config.tap_speed = self.config.tap_speed;
+                    }
+                    hid_manager::MacropadCommand::HoldSpeed(_) => {
+                        macropad.lock().unwrap().config.hold_speed = self.config.hold_speed;
+                    }
+                    hid_manager::MacropadCommand::DefaultDelay(_) => {
+                        macropad.lock().unwrap().config.default_delay = self.config.default_delay;
+                    }
+                    _ => unreachable!(),
+                }
+
+                con.send(hid_manager::Message::Set(action.clone()));
+            }
+        }
+    }
+
+    fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
+        match action {
+            hid_manager::MacropadCommand::TapSpeed(speed) => {
+                self.config.tap_speed = speed;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::ConfigElements::TapSpeed,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            hid_manager::MacropadCommand::HoldSpeed(speed) => {
+                self.config.hold_speed = speed;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::ConfigElements::HoldSpeed,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            hid_manager::MacropadCommand::DefaultDelay(delay) => {
+                self.config.default_delay = delay;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::ConfigElements::DefaultDelay,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            _ => unreachable!(),
         }
     }
 }
 
 impl Default for SettingsTab {
     fn default() -> Self {
-        Self { 
-            macropad: None,
+        Self {
+            config: macro_parser::MacroConfig::default(),
             theme: match dark_light::detect() {
                 dark_light::Mode::Dark => Theme::Dark,
                 dark_light::Mode::Light => Theme::Light,
-            }
-         }
+            },
+            press_time_text: String::from(""),
+            hold_time_text: String::from(""),
+            default_delay_text: String::from(""),
+            actions: HashMap::new(),
+        }
     }
 }
 
@@ -693,55 +891,69 @@ impl Tab for SettingsTab {
     }
 
     fn content(&self) -> Element<'_, Self::Message> {
-        let config = {
-            if let Some(macropad) = &self.macropad {
-                macropad.lock().unwrap().config.clone()
-            } else {
-                panic!("Macropad not set");
-            }
-        };
-
-        // let a = 
-
         let message = column![
             container(column![
                 text("Theme").font(ROBOTO).size(30),
-                button(text(char::from(match self.theme {
-                    Theme::Light => Icon::Sun,
-                    Theme::Dark => Icon::Moon,
-                    _ => Icon::Sun,
-                })).font(ICON_FONT).size(30)).on_press(Message::SwitchTheme)
-            ]).padding(Padding {
+                button(
+                    text(char::from(match self.theme {
+                        Theme::Light => Icon::Sun,
+                        Theme::Dark => Icon::Moon,
+                        _ => Icon::Sun,
+                    }))
+                    .font(ICON_FONT)
+                    .size(30)
+                )
+                .on_press(Message::SwitchTheme)
+            ])
+            .padding(Padding {
                 top: 20,
                 right: 0,
                 bottom: 20,
                 left: 0,
             }),
-
             container(column![
                 text("Press Time (ms)").font(ROBOTO).size(30),
-                text_input((config.tap_speed / 1000).to_string().as_str(), (config.tap_speed / 1000).to_string().as_str(), Message::PressTimeChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(Padding {
+                text_input(
+                    (self.config.tap_speed / 1000).to_string().as_str(),
+                    self.press_time_text.as_str(),
+                    Message::PressTimeChangedText
+                )
+                .font(ROBOTO)
+                .width(Length::Units(50)),
+            ])
+            .padding(Padding {
                 top: 20,
                 right: 0,
                 bottom: 20,
                 left: 0,
             }),
-
             container(column![
                 text("Hold Time (ms)").font(ROBOTO).size(30),
-                text_input((config.hold_speed / 1000).to_string().as_str(), (config.hold_speed / 1000).to_string().as_str(), Message::HoldTimeChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(Padding {
+                text_input(
+                    (self.config.hold_speed / 1000).to_string().as_str(),
+                    self.hold_time_text.as_str(),
+                    Message::HoldTimeChangedText
+                )
+                .font(ROBOTO)
+                .width(Length::Units(50)),
+            ])
+            .padding(Padding {
                 top: 20,
                 right: 0,
                 bottom: 20,
                 left: 0,
             }),
-
             container(column![
                 text("Default Delay (ms)").font(ROBOTO).size(30),
-                text_input((config.default_delay / 1000).to_string().as_str(), (config.default_delay / 1000).to_string().as_str(), Message::DefaultDelayChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(Padding {
+                text_input(
+                    (self.config.default_delay / 1000).to_string().as_str(),
+                    self.default_delay_text.as_str(),
+                    Message::DefaultDelayChangedText
+                )
+                .font(ROBOTO)
+                .width(Length::Units(50)),
+            ])
+            .padding(Padding {
                 top: 20,
                 right: 0,
                 bottom: 20,

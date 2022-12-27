@@ -71,6 +71,16 @@ pub struct MacroConfig {
     pub default_delay: u32,
 }
 
+impl Default for MacroConfig {
+    fn default() -> Self {
+        Self {
+            tap_speed: 200,
+            hold_speed: 200,
+            default_delay: 100,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct KeyConfig {
     pub key_mode: KeyMode,
