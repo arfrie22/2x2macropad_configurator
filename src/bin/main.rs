@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use iced::subscription::{events, events_with};
 use iced::widget::{
     button, column, container, pane_grid, pick_list, progress_bar, row, slider, text, text_input,
-    Column, Container, Row, Space, Text,
+    Column, Container, Row, Space, Text, radio,
 };
 use iced::{alignment, executor, window, Color, Font, Padding, Size};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
@@ -15,9 +15,12 @@ use iced_native::widget::space;
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_parser::LedConfig;
-use macropad_configurator::{hid_manager, macro_parser, macropad};
+use macropad_configurator::type_wrapper::{KeyboardWrapper, ConsumerWrapper};
+use macropad_configurator::{hid_manager, macro_parser, macropad, macropad_wrapper, type_wrapper};
 use macropad_protocol::data_protocol::LedEffect;
+use macropad_protocol::macro_protocol;
 use num_enum::{FromPrimitive, IntoPrimitive};
+use usbd_human_interface_device::page::{Keyboard, Consumer};
 
 const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
@@ -95,15 +98,21 @@ pub enum Message {
     ReturnToMainPage,
     LedUpdate(Instant),
     UpdateTick(Instant),
+    TabSelected(usize),
+    KeyModeChanged(macropad_protocol::data_protocol::KeyMode),
+    KeyboardDataChanged(KeyboardWrapper),
+    ConsumerDataChanged(ConsumerWrapper),
+    KeyPickColor,
+    KeyCancelColor,
+    KeySubmitColor(Color),
     LedEffectChanged(LedEffect),
     LedPeriodChanged(f32),
     LedPeriodChangedText(String),
     LedBrightnessChanged(f32),
     LedBrightnessChangedText(String),
-    PickColor,
-    CancelColor,
-    SubmitColor(Color),
-    TabSelected(usize),
+    LedPickColor,
+    LedCancelColor,
+    LedSubmitColor(Color),
     PressTimeChangedText(String),
     HoldTimeChangedText(String),
     DefaultDelayChangedText(String),
@@ -162,6 +171,8 @@ impl Application for Configurator {
                     },
                     Page::ModifyKey(i),
                 );
+
+                self.key_tab.show_picker = false;
             }
             Message::ButtonHovered(state) => {
                 self.key_tab.selected_key = state;
@@ -177,6 +188,9 @@ impl Application for Configurator {
                     },
                     Page::MainPage(0),
                 );
+                self.key_tab.selected_key = None;
+                self.key_tab.show_picker = false;
+                self.key_tab.clicked = false;
             }
             Message::LedUpdate(_) => {
                 if let State::Connected(con, Page::MainPage(id)) = &mut self.state {
@@ -189,9 +203,65 @@ impl Application for Configurator {
             }
             Message::UpdateTick(_) => {
                 if let State::Connected(con, _) = &mut self.state {
-                    self.led_tab.run_actions(con.get_macropad(), con);
-                    self.settings_tab.run_actions(con.get_macropad(), con);
+                    self.key_tab.run_actions(con);
+                    self.led_tab.run_actions(con);
+                    self.settings_tab.run_actions(con);
                 }
+            }
+            Message::TabSelected(i) => {
+                self.state = State::Connected(
+                    match &mut self.state {
+                        State::Connected(connection, _) => {
+                            match TabId::from(i) {
+                                TabId::MainPage => {}
+                                TabId::ModifyLed => {
+                                    self.led_tab.led_runner.reset();
+                                    self.led_tab.update_config(connection.get_macropad());
+                                }
+                                TabId::ModyifySettings => {
+                                    self.settings_tab.update_config(connection.get_macropad());
+                                }
+                            }
+                            connection.clone()
+                        }
+                        _ => unreachable!(),
+                    },
+                    Page::MainPage(i),
+                );
+            }
+            Message::KeyModeChanged(mode) => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    self.key_tab
+                        .queue_action(hid_manager::MacropadCommand::KeyMode(*i as u8, mode));
+                }
+            }
+            Message::KeyboardDataChanged(data) => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    self.key_tab
+                        .queue_action(hid_manager::MacropadCommand::KeyboardData(*i as u8, data.into()));
+                }
+            }
+            Message::ConsumerDataChanged(data) => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    self.key_tab
+                        .queue_action(hid_manager::MacropadCommand::ConsumerData(*i as u8, data.into()));
+                }
+            }
+            Message::KeyPickColor => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    self.key_tab.show_picker = true;
+                }
+            }
+            Message::KeyCancelColor => {
+                self.key_tab.show_picker = false;
+            }
+            Message::KeySubmitColor(color) => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    let c = color.into_rgba8();
+                    self.key_tab
+                        .queue_action(hid_manager::MacropadCommand::KeyColor(*i as u8, (c[0], c[1], c[2])));
+                }
+                self.key_tab.show_picker = false;
             }
             Message::LedEffectChanged(effect) => {
                 self.led_tab
@@ -231,40 +301,19 @@ impl Application for Configurator {
                     self.led_tab.brightness_text = text;
                 }
             }
-            Message::PickColor => {
+            Message::LedPickColor => {
                 self.led_tab.show_picker = true;
             }
-            Message::CancelColor => {
+            Message::LedCancelColor => {
                 self.led_tab.show_picker = false;
             }
-            Message::SubmitColor(color) => {
+            Message::LedSubmitColor(color) => {
                 let c = color.into_rgba8();
                 self.led_tab
                     .queue_action(hid_manager::MacropadCommand::LedBaseColor((
                         c[0], c[1], c[2],
                     )));
                 self.led_tab.show_picker = false;
-            }
-            Message::TabSelected(i) => {
-                self.state = State::Connected(
-                    match &mut self.state {
-                        State::Connected(connection, _) => {
-                            match TabId::from(i) {
-                                TabId::MainPage => {}
-                                TabId::ModifyLed => {
-                                    self.led_tab.led_runner.reset();
-                                    self.led_tab.update_config(connection.get_macropad());
-                                }
-                                TabId::ModyifySettings => {
-                                    self.settings_tab.update_config(connection.get_macropad());
-                                }
-                            }
-                            connection.clone()
-                        }
-                        _ => unreachable!(),
-                    },
-                    Page::MainPage(i),
-                );
             }
             Message::PressTimeChangedText(text) => {
                 if let Ok(speed) = text.parse::<f32>() {
@@ -375,7 +424,7 @@ impl Application for Configurator {
                     .padding(20)
                     .into()
             }
-            State::Connected(con, Page::MainPage(i)) => Tabs::new(*i, Message::TabSelected)
+            State::Connected(_, Page::MainPage(i)) => Tabs::new(*i, Message::TabSelected)
                 .push(self.key_tab.tab_label(), self.key_tab.view())
                 .push(self.led_tab.tab_label(), self.led_tab.view())
                 .push(self.settings_tab.tab_label(), self.settings_tab.view())
@@ -385,23 +434,201 @@ impl Application for Configurator {
                 .text_font(ROBOTO)
                 .text_size(20)
                 .into(),
-            State::Connected(_, Page::ModifyKey(_)) => {
+            State::Connected(_, Page::ModifyKey(i)) => {
+                let key_settings = match self.key_tab.key_configs[*i].key_mode {
+                    macropad_protocol::data_protocol::KeyMode::MacroMode => {
+                        column![
+                            button("a")
+                        ]
+                    },
+                    macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
+                        column![
+                            button("a")
+                        ]
+                    },
+                    macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
+                        column![
+                            container(column![
+                                text("Key").font(ROBOTO).size(30),
+                                pick_list(
+                                    &type_wrapper::KeyboardWrapper::KEYS[..],
+                                    Some(self.key_tab.key_configs[*i].keyboard_data.into()),
+                                    Message::KeyboardDataChanged
+                                ),
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
+                            container(column![
+                                text("Key Color").font(ROBOTO).size(30),
+                                ColorPicker::new(
+                                    self.key_tab.show_picker,
+                                    Color::from_rgb8(
+                                        self.key_tab.key_configs[*i].key_color.0,
+                                        self.key_tab.key_configs[*i].key_color.1,
+                                        self.key_tab.key_configs[*i].key_color.2
+                                    ),
+                                    button("Pick Color").on_press(Message::KeyPickColor),
+                                    Message::KeyCancelColor,
+                                    Message::KeySubmitColor,
+                                )
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
+                        ]
+                    },
+                    macropad_protocol::data_protocol::KeyMode::ConsumerMode => {
+                        column![
+                            container(column![
+                                text("Consumer").font(ROBOTO).size(30),
+                                pick_list(
+                                    &type_wrapper::ConsumerWrapper::KEYS[..],
+                                    Some(self.key_tab.key_configs[*i].consumer_data.into()),
+                                    Message::ConsumerDataChanged
+                                ),
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
+                            container(column![
+                                text("Key Color").font(ROBOTO).size(30),
+                                ColorPicker::new(
+                                    self.key_tab.show_picker,
+                                    Color::from_rgb8(
+                                        self.key_tab.key_configs[*i].key_color.0,
+                                        self.key_tab.key_configs[*i].key_color.1,
+                                        self.key_tab.key_configs[*i].key_color.2
+                                    ),
+                                    button("Pick Color").on_press(Message::KeyPickColor),
+                                    Message::KeyCancelColor,
+                                    Message::KeySubmitColor,
+                                )
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
+                        ]
+                    },
+                };
+
+                
+                
                 let message = column![
-                    text("Modify Key")
-                        .font(ROBOTO)
-                        .size(60)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
-                    text("This is the modify key page")
-                        .font(ROBOTO)
-                        .size(30)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
-                    button("Back")
-                        .on_press(Message::ReturnToMainPage)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .padding(20)
+                    container(
+                        row![
+                            container(button("Back")
+                                .on_press(Message::ReturnToMainPage)
+                                .width(Length::Shrink)
+                                .height(Length::Shrink)
+                            ).align_x(iced::alignment::Horizontal::Left),
+                            text(format!("Modify Key {}", i))
+                                .font(ROBOTO)
+                                .size(60)
+                                .width(Length::Fill)
+                                .horizontal_alignment(iced::alignment::Horizontal::Center),
+                        ]).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top),
+                    
+                    container(column![
+                        container(column![
+                            text("Key Mode").font(ROBOTO).size(30),
+                            row![
+                                radio("Macro Mode", macropad_protocol::data_protocol::KeyMode::MacroMode, None, Message::KeyModeChanged),
+                                Space::with_width(Length::Units(20)),
+                                radio("Single Tap Mode", macropad_protocol::data_protocol::KeyMode::SingleTapMode, None, Message::KeyModeChanged),
+                                Space::with_width(Length::Units(20)),
+                                radio("Keyboard Mode", macropad_protocol::data_protocol::KeyMode::KeyboardMode, None, Message::KeyModeChanged),
+                                Space::with_width(Length::Units(20)),
+                                radio("Consumer Mode", macropad_protocol::data_protocol::KeyMode::ConsumerMode, None, Message::KeyModeChanged),
+                            ],
+                        ])
+                        .padding(Padding {
+                            top: 20,
+                            right: 0,
+                            bottom: 20,
+                            left: 0,
+                        }),
+                        key_settings,
+                    ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(20)
+                    // container(column![
+                    //     text("Theme").font(ROBOTO).size(30),
+                    //     button(
+                    //         text(char::from(match self.theme {
+                    //             Theme::Light => Icon::Sun,
+                    //             Theme::Dark => Icon::Moon,
+                    //             _ => Icon::Sun,
+                    //         }))
+                    //         .font(ICON_FONT)
+                    //         .size(30)
+                    //     )
+                    //     .on_press(Message::SwitchTheme)
+                    // ])
+                    // .padding(Padding {
+                    //     top: 20,
+                    //     right: 0,
+                    //     bottom: 20,
+                    //     left: 0,
+                    // }),
+                    // container(column![
+                    //     text("Press Time (ms)").font(ROBOTO).size(30),
+                    //     text_input(
+                    //         (self.config.tap_speed / 1000).to_string().as_str(),
+                    //         self.press_time_text.as_str(),
+                    //         Message::PressTimeChangedText
+                    //     )
+                    //     .font(ROBOTO)
+                    //     .width(Length::Units(50)),
+                    // ])
+                    // .padding(Padding {
+                    //     top: 20,
+                    //     right: 0,
+                    //     bottom: 20,
+                    //     left: 0,
+                    // }),
+                    // container(column![
+                    //     text("Hold Time (ms)").font(ROBOTO).size(30),
+                    //     text_input(
+                    //         (self.config.hold_speed / 1000).to_string().as_str(),
+                    //         self.hold_time_text.as_str(),
+                    //         Message::HoldTimeChangedText
+                    //     )
+                    //     .font(ROBOTO)
+                    //     .width(Length::Units(50)),
+                    // ])
+                    // .padding(Padding {
+                    //     top: 20,
+                    //     right: 0,
+                    //     bottom: 20,
+                    //     left: 0,
+                    // }),
+                    // container(column![
+                    //     text("Default Delay (ms)").font(ROBOTO).size(30),
+                    //     text_input(
+                    //         (self.config.default_delay / 1000).to_string().as_str(),
+                    //         self.default_delay_text.as_str(),
+                    //         Message::DefaultDelayChangedText
+                    //     )
+                    //     .font(ROBOTO)
+                    //     .width(Length::Units(50)),
+                    // ])
+                    // .padding(Padding {
+                    //     top: 20,
+                    //     right: 0,
+                    //     bottom: 20,
+                    //     left: 0,
+                    // }),
                 ];
 
                 container(message)
@@ -409,7 +636,7 @@ impl Application for Configurator {
                     .height(Length::Fill)
                     .center_x()
                     .center_y()
-                    .padding(20)
+                    .padding(100)
                     .into()
             }
             State::Connected(_, Page::RecordMacro(_)) => {
@@ -478,15 +705,91 @@ trait Tab {
 struct KeyTab {
     selected_key: Option<usize>,
     clicked: bool,
+    show_picker: bool,
     key_configs: Vec<macro_parser::KeyConfig>,
+    macros: Vec<macro_parser::MacroCollection>,
+    actions: HashMap<
+        macropad_protocol::data_protocol::KeyConfigElements,
+        (bool, Instant, hid_manager::MacropadCommand),
+    >,
 }
 
 impl KeyTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>) -> Self {
+        let macropad = macropad.lock().unwrap().clone();
         Self {
             selected_key: None,
             clicked: false,
-            key_configs: macropad.lock().unwrap().key_configs.clone(),
+            show_picker: false,
+            key_configs: macropad.key_configs.clone(),
+            macros: macropad.macros.clone(),
+            actions: HashMap::new(),
+        }
+    }
+
+    fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
+        let macropad = macropad.lock().unwrap().clone();
+        self.key_configs = macropad.key_configs.clone();
+        self.macros = macropad.macros.clone();
+    }
+
+    fn run_actions(&mut self, con: &mut Connection) {
+        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+            if *active && time_to_run.elapsed() > Duration::ZERO {
+                *active = false;
+
+                con.send(hid_manager::Message::Set(action.clone()));
+            }
+        }
+    }
+
+    fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
+        match action {
+            hid_manager::MacropadCommand::KeyMode(key, mode) => {
+                self.key_configs[key as usize].key_mode = mode;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::KeyConfigElements::KeyMode,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            hid_manager::MacropadCommand::KeyboardData(key, keyboard) => {
+                self.key_configs[key as usize].keyboard_data = keyboard;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::KeyConfigElements::KeyboardData,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            hid_manager::MacropadCommand::ConsumerData(key, consumer) => {
+                self.key_configs[key as usize].consumer_data = consumer;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::KeyConfigElements::ConsumerData,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            hid_manager::MacropadCommand::KeyColor(key, color) => {
+                self.key_configs[key as usize].key_color = color;
+                self.actions.insert(
+                    macropad_protocol::data_protocol::KeyConfigElements::KeyColor,
+                    (
+                        true,
+                        Instant::now() + Duration::from_millis(ACTION_DELAY),
+                        action,
+                    ),
+                );
+            }
+            _ => unreachable!(),
         }
     }
 }
@@ -496,7 +799,10 @@ impl Default for KeyTab {
         Self {
             selected_key: None,
             clicked: false,
+            show_picker: false,
             key_configs: Vec::new(),
+            macros: Vec::new(),
+            actions: HashMap::new(),
         }
     }
 }
@@ -563,31 +869,10 @@ impl LedTab {
         self.config = macropad.lock().unwrap().led_config.clone();
     }
 
-    fn run_actions(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>, con: &mut Connection) {
+    fn run_actions(&mut self, con: &mut Connection) {
         for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
             if *active && time_to_run.elapsed() > Duration::ZERO {
                 *active = false;
-
-                match action {
-                    hid_manager::MacropadCommand::LedBaseColor(_) => {
-                        macropad.lock().unwrap().led_config.base_color = self.config.base_color;
-                    }
-                    hid_manager::MacropadCommand::LedEffect(_) => {
-                        macropad.lock().unwrap().led_config.effect = self.config.effect;
-                    }
-                    hid_manager::MacropadCommand::LedBrightness(_) => {
-                        macropad.lock().unwrap().led_config.brightness = self.config.brightness;
-                    }
-                    hid_manager::MacropadCommand::LedEffectPeriod(_) => {
-                        macropad.lock().unwrap().led_config.effect_period =
-                            self.config.effect_period;
-                    }
-                    hid_manager::MacropadCommand::LedEffectOffset(_) => {
-                        macropad.lock().unwrap().led_config.effect_offset =
-                            self.config.effect_offset;
-                    }
-                    _ => unreachable!(),
-                }
 
                 con.send(hid_manager::Message::Set(action.clone()));
             }
@@ -756,9 +1041,9 @@ impl Tab for LedTab {
                             self.config.base_color.1,
                             self.config.base_color.2
                         ),
-                        button("Pick Color").on_press(Message::PickColor),
-                        Message::CancelColor,
-                        Message::SubmitColor,
+                        button("Pick Color").on_press(Message::LedPickColor),
+                        Message::LedCancelColor,
+                        Message::LedSubmitColor,
                     )
                 ])
                 .padding(Padding {
@@ -812,23 +1097,10 @@ impl SettingsTab {
         self.config = macropad.lock().unwrap().config.clone();
     }
 
-    fn run_actions(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>, con: &mut Connection) {
+    fn run_actions(&mut self, con: &mut Connection) {
         for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
             if *active && time_to_run.elapsed() > Duration::ZERO {
                 *active = false;
-
-                match action {
-                    hid_manager::MacropadCommand::TapSpeed(_) => {
-                        macropad.lock().unwrap().config.tap_speed = self.config.tap_speed;
-                    }
-                    hid_manager::MacropadCommand::HoldSpeed(_) => {
-                        macropad.lock().unwrap().config.hold_speed = self.config.hold_speed;
-                    }
-                    hid_manager::MacropadCommand::DefaultDelay(_) => {
-                        macropad.lock().unwrap().config.default_delay = self.config.default_delay;
-                    }
-                    _ => unreachable!(),
-                }
 
                 con.send(hid_manager::Message::Set(action.clone()));
             }
