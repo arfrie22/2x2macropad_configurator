@@ -87,8 +87,6 @@ struct Configurator {
 pub enum Message {
     HidMessage(hid_manager::Message),
     HidEvent(hid_manager::Event),
-    MacroLoaded(macro_parser::Macro),
-    MacroSaved,
     CommandSent(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandReceived(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandErrored,
@@ -100,6 +98,7 @@ pub enum Message {
     UpdateTick(Instant),
     TabSelected(usize),
     KeyModeChanged(macropad_protocol::data_protocol::KeyMode),
+    LoadMacro(macro_parser::MacroType),
     KeyboardDataChanged(KeyboardWrapper),
     ConsumerDataChanged(ConsumerWrapper),
     KeyPickColor,
@@ -158,8 +157,6 @@ impl Application for Configurator {
                 self.state = State::Disconnected;
             }
             Message::HidEvent(_) => {}
-            Message::MacroLoaded(_) => {}
-            Message::MacroSaved => {}
             Message::CommandSent(_, _) => {}
             Message::CommandReceived(_, _) => {}
             Message::CommandErrored => {}
@@ -233,6 +230,14 @@ impl Application for Configurator {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
                         .queue_action(hid_manager::MacropadCommand::KeyMode(*i as u8, mode));
+                }
+            }
+            Message::LoadMacro(macro_type) => {
+                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    self.state = State::Connected(
+                        con.clone(),
+                        Page::EditMacro(*i, macro_type),
+                    );
                 }
             }
             Message::KeyboardDataChanged(data) => {
@@ -438,12 +443,46 @@ impl Application for Configurator {
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
                     macropad_protocol::data_protocol::KeyMode::MacroMode => {
                         column![
-                            button("a")
+                            container(column![
+                                text("Key Mode").font(ROBOTO).size(30),
+                                row![
+                                    button("Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Double Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::DoubleTap)),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Tap and Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::TapHold)),
+                                ],
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
                         ]
                     },
                     macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
                         column![
-                            button("a")
+                            container(column![
+                                text("Key Mode").font(ROBOTO).size(30),
+                                row![
+                                    button("Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Double Tap Macro"),
+                                    Space::with_width(Length::Units(20)),
+                                    button("Tap and Hold Macro"),
+                                ],
+                            ])
+                            .padding(Padding {
+                                top: 20,
+                                right: 0,
+                                bottom: 20,
+                                left: 0,
+                            }),
                         ]
                     },
                     macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
@@ -639,7 +678,7 @@ impl Application for Configurator {
                     .padding(100)
                     .into()
             }
-            State::Connected(_, Page::RecordMacro(_)) => {
+            State::Connected(_, Page::EditMacro(_, _)) => {
                 // pane_grid()
                 todo!()
             }
@@ -654,9 +693,8 @@ impl Application for Configurator {
 #[derive(Debug)]
 enum Page {
     MainPage(usize),
-    // ModifyLeds(LedRunner),
     ModifyKey(usize),
-    RecordMacro(usize),
+    EditMacro(usize, macro_parser::MacroType),
 }
 
 #[repr(usize)]

@@ -49,6 +49,14 @@ pub enum MacroAction {
 }
 
 #[derive(Debug, Clone)]
+pub enum MacroType {
+    Tap,
+    Hold,
+    DoubleTap,
+    TapHold,
+}
+
+#[derive(Debug, Clone)]
 pub struct Macro {
     pub frames: Vec<MacroFrame>,
 }
