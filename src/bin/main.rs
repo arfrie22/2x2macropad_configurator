@@ -90,6 +90,8 @@ pub enum Message {
     CommandReceived(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandErrored,
     ButtonPressed(usize),
+    ButtonHovered(Option<usize>),
+    ButtonClicked(bool),
     ReturnToMainPage,
     LedUpdate(Instant),
     UpdateTick(Instant),
@@ -160,6 +162,12 @@ impl Application for Configurator {
                     },
                     Page::ModifyKey(i),
                 );
+            }
+            Message::ButtonHovered(state) => {
+                self.key_tab.selected_key = state;
+            }
+            Message::ButtonClicked(state) => {
+                self.key_tab.clicked = state;
             }
             Message::ReturnToMainPage => {
                 self.state = State::Connected(
@@ -322,11 +330,7 @@ impl Application for Configurator {
             hid_manager::connect().map(Message::HidEvent),
             match &self.state {
                 State::Connected(_, Page::MainPage(i)) => {
-                    if TabId::from(*i) == TabId::ModifyLed {
-                        iced::time::every(Duration::from_millis(16)).map(Message::LedUpdate)
-                    } else {
-                        Subscription::none()
-                    }
+                    iced::time::every(Duration::from_millis(16)).map(Message::LedUpdate)
                 }
                 _ => Subscription::none(),
             },
@@ -464,20 +468,28 @@ trait Tab {
 
 #[derive(Debug)]
 struct KeyTab {
-    macropad: Option<Arc<Mutex<macro_parser::Macropad>>>,
+    selected_key: Option<usize>,
+    clicked: bool,
+    key_configs: Vec<macro_parser::KeyConfig>,
 }
 
 impl KeyTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>) -> Self {
         Self {
-            macropad: Some(macropad),
+            selected_key: None,
+            clicked: false,
+            key_configs: macropad.lock().unwrap().key_configs.clone(),
         }
     }
 }
 
 impl Default for KeyTab {
     fn default() -> Self {
-        Self { macropad: None }
+        Self {
+            selected_key: None,
+            clicked: false,
+            key_configs: Vec::new(),
+        }
     }
 }
 
@@ -493,21 +505,13 @@ impl Tab for KeyTab {
     }
 
     fn content(&self) -> Element<'_, Self::Message> {
-        let macropad = {
-            if let Some(macropad) = &self.macropad {
-                macropad.lock().unwrap().clone()
-            } else {
-                panic!("Macropad not set");
-            }
-        };
-
         let message = column![
             text("Select a key to modify")
                 .font(ROBOTO)
                 .size(60)
                 .width(Length::Fill)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
-            macropad::macropad_button().on_press(Message::ButtonPressed)
+            macropad::macropad_button(self.selected_key, self.clicked).on_press(Message::ButtonPressed).on_hover(Message::ButtonHovered).on_click(Message::ButtonClicked),
         ];
 
         container(message)

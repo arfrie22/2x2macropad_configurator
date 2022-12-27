@@ -34,25 +34,29 @@ pub struct Macropad<'a, Message> {
     pub glow: [Color; 4],   
     selected: Option<usize>,
     clicked: bool,
-    message: Option<Box<dyn Fn(usize) -> Message + 'a>>,
+    press_message: Option<Box<dyn Fn(usize) -> Message + 'a>>,
+    hover_message: Option<Box<dyn Fn(Option<usize>) -> Message + 'a>>,
+    click_message: Option<Box<dyn Fn(bool) -> Message + 'a>>,
 }
 
-pub fn macropad<'a, Message>(interactable: bool, glow: [Color; 4], message: Option<Box<dyn Fn(usize) -> Message + 'a>>) -> Macropad<'a, Message> {
+pub fn macropad<'a, Message>(interactable: bool, glow: [Color; 4], selected: Option<usize>, clicked: bool, press_message: Option<Box<dyn Fn(usize) -> Message + 'a>>, hover_message: Option<Box<dyn Fn(Option<usize>) -> Message + 'a>>, click_message: Option<Box<dyn Fn(bool) -> Message + 'a>>) -> Macropad<'a, Message> {
     Macropad {
         interactable,
         glow,
-        selected: None,
-        clicked: false,
-        message
+        selected,
+        clicked,
+        press_message,
+        hover_message,
+        click_message,
     }
 }
 
-pub fn macropad_button<'a, Message>() -> Macropad<'a, Message> {
-    macropad(true, [Color::TRANSPARENT; 4], None)
+pub fn macropad_button<'a, Message>(selected: Option<usize>, clicked: bool) -> Macropad<'a, Message> {
+    macropad(true, [Color::TRANSPARENT; 4], selected, clicked, None, None, None)
 }
 
 pub fn macropad_led<'a, Message>(glow: [Color; 4]) -> Macropad<'a, Message> {
-    macropad(false, glow, None)
+    macropad(false, glow, None, false, None, None, None)
 }
 
 impl<'a, Message> Macropad<'a, Message> {
@@ -60,7 +64,21 @@ impl<'a, Message> Macropad<'a, Message> {
     pub fn on_press<F>(mut self, message: F) -> Self 
     where F: 'a + Fn(usize) -> Message,
     {
-        self.message = Some(Box::new(message));
+        self.press_message = Some(Box::new(message));
+        self
+    }
+
+    pub fn on_hover<F>(mut self, message: F) -> Self 
+    where F: 'a + Fn(Option<usize>) -> Message,
+    {
+        self.hover_message = Some(Box::new(message));
+        self
+    }
+
+    pub fn on_click<F>(mut self, message: F) -> Self 
+    where F: 'a + Fn(bool) -> Message,
+    {
+        self.click_message = Some(Box::new(message));
         self
     }
 
@@ -131,28 +149,28 @@ where
                 if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
                     for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
                         if key.contains(cursor_position) {
-                            self.selected = Some(i);
+                            shell.publish(self.hover_message.as_ref().unwrap()(Some(i)));
                             return iced::event::Status::Captured;
                         }
                     }
-                    self.selected = None;
-                    self.clicked = false;
+                    shell.publish(self.hover_message.as_ref().unwrap()(None));
+                    shell.publish(self.click_message.as_ref().unwrap()(false));
                 }
             }
 
             if let Some(i) = self.selected {
                 match event {
                     iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
-                        self.clicked = true;
+                        shell.publish(self.click_message.as_ref().unwrap()(true));
                         return iced::event::Status::Captured;
                     }
                     iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
                         if self.clicked {
                             if self.get_keys(&layout.bounds())[i].contains(cursor_position) {
-                                shell.publish(self.message.as_ref().unwrap()(i));
+                                shell.publish(self.press_message.as_ref().unwrap()(i));
                             }
                             
-                            self.clicked = false;
+                            shell.publish(self.click_message.as_ref().unwrap()(false));
                             return iced::event::Status::Captured;
                         }
                     }
