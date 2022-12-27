@@ -203,13 +203,14 @@ impl Application for Configurator {
                     .queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period / 10.0));
             }
             Message::LedPeriodChangedText(text) => {
-                self.led_tab.period_text = text.clone();
-
                 if let Ok(period) = text.parse::<f32>() {
                     if (-5.0..=5.0).contains(&period) {
+                        self.led_tab.period_text = text.clone();
                         self.led_tab
                             .queue_action(hid_manager::MacropadCommand::LedEffectPeriod(period));
                     }
+                } else if text == "" {
+                    self.led_tab.period_text = text;
                 }
             }
             Message::LedBrightnessChanged(brightness) => {
@@ -220,13 +221,14 @@ impl Application for Configurator {
                     ));
             }
             Message::LedBrightnessChangedText(text) => {
-                self.led_tab.brightness_text = text.clone();
-
                 if let Ok(brightness) = text.parse::<u8>() {
                     if (0..=255).contains(&brightness) {
+                        self.led_tab.brightness_text = text;
                         self.led_tab
                             .queue_action(hid_manager::MacropadCommand::LedBrightness(brightness));
                     }
+                } else if text == "" {
+                    self.led_tab.brightness_text = text;
                 }
             }
             Message::PickColor => {
@@ -265,51 +267,57 @@ impl Application for Configurator {
                 );
             }
             Message::PressTimeChangedText(text) => {
-                self.settings_tab.press_time_text = text.clone();
-
                 if let Ok(speed) = text.parse::<f32>() {
                     let speed = (speed * 1000.0).trunc() / 1000.0;
                     if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
                         if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
-                            self.settings_tab.default_delay_text = format!("{:.3}", speed);
+                            self.settings_tab.press_time_text = format!("{:.3}", speed);
+                        } else {
+                            self.settings_tab.press_time_text = text;
                         }
                         self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::TapSpeed(
                                 (speed * 1000.0) as u32,
                             ));
                     }
+                } else if text == "" {
+                    self.settings_tab.press_time_text = text;
                 }
             }
             Message::HoldTimeChangedText(text) => {
-                self.settings_tab.hold_time_text = text.clone();
-
                 if let Ok(speed) = text.parse::<f32>() {
                     let speed = (speed * 1000.0).trunc() / 1000.0;
                     if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
                         if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
-                            self.settings_tab.default_delay_text = format!("{:.3}", speed);
+                            self.settings_tab.hold_time_text = format!("{:.3}", speed);
+                        } else {
+                            self.settings_tab.hold_time_text = text;
                         }
                         self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::HoldSpeed(
                                 (speed * 1000.0) as u32,
                             ));
                     }
+                } else if text == "" {
+                    self.settings_tab.hold_time_text = text;
                 }
             }
             Message::DefaultDelayChangedText(text) => {
-                self.settings_tab.default_delay_text = text.clone();
-
                 if let Ok(speed) = text.parse::<f32>() {
                     let speed = (speed * 1000.0).trunc() / 1000.0;
                     if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
                         if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
                             self.settings_tab.default_delay_text = format!("{:.3}", speed);
+                        } else {
+                            self.settings_tab.default_delay_text = text;
                         }
                         self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::DefaultDelay(
                                 (speed * 1000.0) as u32,
                             ));
                     }
+                } else if text == "" {
+                    self.settings_tab.default_delay_text = text;
                 }
             }
             Message::SwitchTheme => {
