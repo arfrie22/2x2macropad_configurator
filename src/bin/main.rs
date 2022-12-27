@@ -601,73 +601,6 @@ impl Application for Configurator {
                         }),
                         key_settings,
                     ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(20)
-                    // container(column![
-                    //     text("Theme").font(ROBOTO).size(30),
-                    //     button(
-                    //         text(char::from(match self.theme {
-                    //             Theme::Light => Icon::Sun,
-                    //             Theme::Dark => Icon::Moon,
-                    //             _ => Icon::Sun,
-                    //         }))
-                    //         .font(ICON_FONT)
-                    //         .size(30)
-                    //     )
-                    //     .on_press(Message::SwitchTheme)
-                    // ])
-                    // .padding(Padding {
-                    //     top: 20,
-                    //     right: 0,
-                    //     bottom: 20,
-                    //     left: 0,
-                    // }),
-                    // container(column![
-                    //     text("Press Time (ms)").font(ROBOTO).size(30),
-                    //     text_input(
-                    //         (self.config.tap_speed / 1000).to_string().as_str(),
-                    //         self.press_time_text.as_str(),
-                    //         Message::PressTimeChangedText
-                    //     )
-                    //     .font(ROBOTO)
-                    //     .width(Length::Units(50)),
-                    // ])
-                    // .padding(Padding {
-                    //     top: 20,
-                    //     right: 0,
-                    //     bottom: 20,
-                    //     left: 0,
-                    // }),
-                    // container(column![
-                    //     text("Hold Time (ms)").font(ROBOTO).size(30),
-                    //     text_input(
-                    //         (self.config.hold_speed / 1000).to_string().as_str(),
-                    //         self.hold_time_text.as_str(),
-                    //         Message::HoldTimeChangedText
-                    //     )
-                    //     .font(ROBOTO)
-                    //     .width(Length::Units(50)),
-                    // ])
-                    // .padding(Padding {
-                    //     top: 20,
-                    //     right: 0,
-                    //     bottom: 20,
-                    //     left: 0,
-                    // }),
-                    // container(column![
-                    //     text("Default Delay (ms)").font(ROBOTO).size(30),
-                    //     text_input(
-                    //         (self.config.default_delay / 1000).to_string().as_str(),
-                    //         self.default_delay_text.as_str(),
-                    //         Message::DefaultDelayChangedText
-                    //     )
-                    //     .font(ROBOTO)
-                    //     .width(Length::Units(50)),
-                    // ])
-                    // .padding(Padding {
-                    //     top: 20,
-                    //     right: 0,
-                    //     bottom: 20,
-                    //     left: 0,
-                    // }),
                 ];
 
                 container(message)
@@ -678,9 +611,18 @@ impl Application for Configurator {
                     .padding(100)
                     .into()
             }
-            State::Connected(_, Page::EditMacro(_, _)) => {
+            State::Connected(_, Page::EditMacro(i, macro_type)) => {
                 // pane_grid()
-                todo!()
+                let message = text(format!("Edit {:?} Macro {:?}", macro_type, i)).font(ROBOTO).size(60);
+
+                container(message)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x()
+                    .center_y()
+                    .padding(100)
+                    .into()
+                // todo!()
             }
         }
     }
