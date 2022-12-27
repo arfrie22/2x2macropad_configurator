@@ -1,14 +1,15 @@
 use std::sync::{Mutex, Arc};
 use std::time::{Duration, Instant};
 
-use iced::{executor, window, Font, Color};
-use iced::widget::{button, column, container, progress_bar, text, Column, Row, pick_list, slider, row, text_input, Text, Container};
+use iced::{executor, window, Font, Color, Padding};
+use iced::widget::{button, column, container, progress_bar, text, Column, Row, pick_list, slider, row, text_input, Text, Container, Space};
 use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
 };
 use iced_aw::{color_picker, TabLabel, Tabs, ColorPicker};
 use iced_aw::style::TabBarStyles;
+use iced_native::widget::space;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::{hid_manager, macro_parser, macropad};
@@ -503,8 +504,8 @@ impl Tab for LedTab {
             } else {
                 panic!("Macropad not set");
             }
-        };
-    
+        };        
+        
         let message = column![
             row![
                 column![
@@ -513,23 +514,40 @@ impl Tab for LedTab {
                         pick_list(&macropad_configurator::macropad_wrapper::EFFECTS[..], 
                             Some(config.effect), 
                             Message::LedEffectChanged),
-                    ]).padding(20),
+                    ]).padding(Padding {
+                        top: 20,
+                        right: 0,
+                        bottom: 20,
+                        left: 0,
+                    }),
                     
                     container(column![
                         text("Period").font(ROBOTO).size(30),
                         row![
                             slider(-50.0..=50.0, config.effect_period * 10.0, Message::LedPeriodChanged).width(Length::Units(200)),
+                            Space::with_width(Length::Units(20)),
                             text_input(config.effect_period.to_string().as_str(), config.effect_period.to_string().as_str(), Message::LedPeriodChangedText).font(ROBOTO).width(Length::Units(50)),
                         ],
-                    ]).padding(20),
+                    ]).padding(Padding {
+                        top: 20,
+                        right: 0,
+                        bottom: 20,
+                        left: 0,
+                    }),
 
                     container(column![
                         text("Brightness").font(ROBOTO).size(30),
                         row![
                             slider(0.0..=255.0, config.brightness as f32, Message::LedBrightnessChanged).width(Length::Units(200)),
+                            Space::with_width(Length::Units(20)),
                             text_input(config.brightness.to_string().as_str(), config.brightness.to_string().as_str(), Message::LedBrightnessChangedText).font(ROBOTO).width(Length::Units(50)),
                         ],
-                    ]).padding(20),
+                    ]).padding(Padding {
+                        top: 20,
+                        right: 0,
+                        bottom: 20,
+                        left: 0,
+                    }),
                     
                     container(column![
                         text("Base Color").font(ROBOTO).size(30),
@@ -540,7 +558,12 @@ impl Tab for LedTab {
                             Message::CancelColor,
                             Message::SubmitColor,
                         )
-                    ]).padding(20),
+                    ]).padding(Padding {
+                        top: 20,
+                        right: 0,
+                        bottom: 20,
+                        left: 0,
+                    }),
                 ],
 
                 macropad::macropad_led(self.led_runner.get_leds(&config)),
@@ -614,22 +637,42 @@ impl Tab for SettingsTab {
                     Theme::Dark => Icon::Moon,
                     _ => Icon::Sun,
                 })).font(ICON_FONT).size(30)).on_press(Message::SwitchTheme)
-            ]).padding(20),
+            ]).padding(Padding {
+                top: 20,
+                right: 0,
+                bottom: 20,
+                left: 0,
+            }),
 
             container(column![
                 text("Press Time (ms)").font(ROBOTO).size(30),
                 text_input((config.tap_speed / 1000).to_string().as_str(), (config.tap_speed / 1000).to_string().as_str(), Message::PressTimeChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(20),
+            ]).padding(Padding {
+                top: 20,
+                right: 0,
+                bottom: 20,
+                left: 0,
+            }),
 
             container(column![
                 text("Hold Time (ms)").font(ROBOTO).size(30),
                 text_input((config.hold_speed / 1000).to_string().as_str(), (config.hold_speed / 1000).to_string().as_str(), Message::HoldTimeChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(20),
+            ]).padding(Padding {
+                top: 20,
+                right: 0,
+                bottom: 20,
+                left: 0,
+            }),
 
             container(column![
                 text("Default Delay (ms)").font(ROBOTO).size(30),
                 text_input((config.default_delay / 1000).to_string().as_str(), (config.default_delay / 1000).to_string().as_str(), Message::DefaultDelayChangedText).font(ROBOTO).width(Length::Units(50)),
-            ]).padding(20),
+            ]).padding(Padding {
+                top: 20,
+                right: 0,
+                bottom: 20,
+                left: 0,
+            }),
         ];
 
         container(message)
