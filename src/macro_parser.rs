@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use hidapi::HidDevice;
-use macropad_protocol::{macro_protocol::MacroCommand, data_protocol::{KeyMode, LedEffect}};
+use macropad_protocol::{macro_protocol::{MacroCommand, MacroSectionAnnotation}, data_protocol::{KeyMode, LedEffect}};
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
 use crate::macropad_wrapper::{self, prime_device};
 
 #[derive(Debug, Clone)]
 enum ActionType {
-    None(Vec<MacroAction>),
+    Action(Vec<MacroAction>),
     String(String, Duration),
     Chord(Vec<Keyboard>, Duration),
 }
@@ -22,7 +22,7 @@ pub struct MacroFrame {
 impl Default for MacroFrame {
     fn default() -> Self {
         Self {
-            action_type: ActionType::None(vec![]),
+            action_type: ActionType::Action(vec![]),
             delay: None,
         }
     }
@@ -31,18 +31,6 @@ impl Default for MacroFrame {
 impl MacroFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn from(actions: Vec<MacroAction>, delay: Option<Duration>) -> Self {
-        Self {
-            actions,
-            delay,
-        }
-    }
-
-    pub fn add_action(&mut self, action: MacroAction) -> &mut Self {
-        self.actions.push(action);
-        self
     }
 }
 
@@ -71,10 +59,7 @@ pub struct Macro {
 impl Default for Macro {
     fn default() -> Self {
         Self {
-            frames: vec![MacroFrame {
-                actions: vec![],
-                delay: None,
-            }],
+            frames: vec![],
         }
     }
 }
@@ -250,6 +235,23 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
         let mut delay = None;
         while command != MacroCommand::CommandTerminator {
             match command {
+                MacroCommand::CommandSectionAnnotation => {
+                    if !actions.is_empty() {
+                        println!("Warning: Section annotation found in the middle of a macro, skipping");
+                        i += 2;
+                    } else {
+                        let annotation = MacroSectionAnnotation::from(data[i + 1]);
+                        match annotation {
+                            MacroSectionAnnotation::None => {
+                                println!("Warning: Section annotation found with no annotation, skipping");
+                                i += 2;
+                            },
+                            MacroSectionAnnotation::String => {},
+                            MacroSectionAnnotation::Chord => todo!(),
+                        }
+                    }
+                    
+                }
                 MacroCommand::CommandDelay => {
                     let delay_bytes = [data[i + 1], data[i + 2], data[i + 3], data[i + 4]];
                     let delay_millis = u32::from_le_bytes(delay_bytes);
