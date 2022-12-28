@@ -1235,9 +1235,14 @@ impl Tab for SettingsTab {
     }
 }
 
+// // Ability to annoate sections for compounds (type string or press chord)
+// // 0x?? 0xID (start) 0x...... 0x?? 0xID (end)
+
 // struct Pane {
 //     id: usize,
-//     // pub is_pinned: bool,
+//     sibbling_id: Option<usize>,
+//     action_type: ActionType,
+//     delay: u32,
 // }
 
 // impl Pane {

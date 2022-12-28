@@ -7,15 +7,22 @@ use usbd_human_interface_device::page::{Consumer, Keyboard};
 use crate::macropad_wrapper::{self, prime_device};
 
 #[derive(Debug, Clone)]
+enum ActionType {
+    None(Vec<MacroAction>),
+    String(String, Duration),
+    Chord(Vec<Keyboard>, Duration),
+}
+
+#[derive(Debug, Clone)]
 pub struct MacroFrame {
-    pub actions: Vec<MacroAction>,
+    pub action_type: ActionType,
     pub delay: Option<Duration>,
 }
 
 impl Default for MacroFrame {
     fn default() -> Self {
         Self {
-            actions: vec![],
+            action_type: ActionType::None(vec![]),
             delay: None,
         }
     }
