@@ -11,6 +11,7 @@ enum ActionType {
     Action(Vec<MacroAction>),
     String(String, Duration),
     Chord(Vec<Keyboard>, Duration),
+    Loop(Vec<MacroFrame>, u8),
 }
 
 #[derive(Debug, Clone)]
