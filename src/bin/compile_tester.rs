@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use hidapi::HidApi;
 use macropad_configurator::{
-    macro_parser::{self, parse_macro, Macro, MacroAction, MacroFrame, ActionType},
+    macro_parser::{self, parse_macro, Macro, MacroFrame, ActionType},
     macropad_wrapper::{self, prime_device},
 };
 use macropad_protocol::{
@@ -44,12 +44,12 @@ fn main() {
             //     None,
             // ));
 
-            mac.add_frame(MacroFrame::from(
-                vec![
-                    MacroAction::SetLed((255, 0, 0)),
-                ],
-                Some(Duration::from_millis(200)),
-            ));
+            // mac.add_frame(MacroFrame::from(
+            //     vec![
+            //         MacroAction::SetLed((255, 0, 0)),
+            //     ],
+            //     Some(Duration::from_millis(200)),
+            // ));
 
             // mac.add_frame(MacroFrame::from(
             //     vec![
@@ -62,29 +62,29 @@ fn main() {
             //     delay: Some(Duration::from_millis(200)),
             // });
 
+            mac.add_frame(MacroFrame {
+                action: macro_parser::ActionType::String(
+                    "This is a test, lmao".to_string(),
+                    Some(Duration::from_millis(100)),
+                ),
+                delay: None,
+            });
+
             // mac.add_frame(MacroFrame {
-            //     action: macro_parser::ActionType::String(
-            //         "This is a test, lmao".to_string(),
-            //         Some(Duration::from_millis(100)),
-            //     ),
-            //     delay: None,
+            //     action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
+            //     delay: Some(Duration::from_millis(70)),
             // });
 
-            mac.add_frame(MacroFrame {
-                action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
-                delay: Some(Duration::from_millis(70)),
-            });
-
             
-            mac.add_frame(MacroFrame {
-                action: macro_parser::ActionType::ConsumerPress(Consumer::VolumeIncrement, Some(Duration::from_millis(40))),
-                delay: Some(Duration::from_millis(20)),
-            });
+            // mac.add_frame(MacroFrame {
+            //     action: macro_parser::ActionType::ConsumerPress(Consumer::VolumeIncrement, Some(Duration::from_millis(40))),
+            //     delay: Some(Duration::from_millis(20)),
+            // });
 
-            mac.add_frame(MacroFrame {
-                action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
-                delay: Some(Duration::from_millis(70)),
-            });
+            // mac.add_frame(MacroFrame {
+            //     action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
+            //     delay: Some(Duration::from_millis(70)),
+            // });
 
             // mac.add_frame(MacroFrame {
             //     action: ActionType::Loop(vec![
@@ -103,7 +103,7 @@ fn main() {
             //     delay: Some(Duration::from_millis(200)),
             // });
 
-            let macro_data = mac.pack().unwrap();
+            let mut macro_data = mac.pack().unwrap();
 
             macropad_wrapper::set_led_base_color(&d, (255, 0, 0)).unwrap();
             macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
@@ -112,10 +112,14 @@ fn main() {
             // println!("Macro data: {:?}", parse_macro(&macro_data));
             // println!("In\n{:?}", macro_data);
             macropad_wrapper::clear_macro(&d, 4).unwrap();
-            macropad_wrapper::set_macro(&d, 4, &macro_data).unwrap();
+            macro_data[1] = 0x00;
+            let macro_2 = parse_macro(&macro_data);
+            println!("Macro 2: {:?}", macro_2);
+            let macro_data_2 = macro_2.pack().unwrap();
+            macropad_wrapper::set_macro(&d, 4, &macro_data_2).unwrap();
             // println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
-            // macro_data[1] = 0x00;
-            macropad_wrapper::validate_macro(&d, 4, &macro_data).unwrap();
+            
+            macropad_wrapper::validate_macro(&d, 4, &macro_data_2).unwrap();
 
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
         }

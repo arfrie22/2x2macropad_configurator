@@ -438,6 +438,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
         
 
     while command != MacroCommand::CommandTerminator {
+        let mut inserted = false;
         while command == MacroCommand::CommandSectionAnnotation {
             let annotation = MacroSectionAnnotation::from(data[i + 1]);
             match annotation {
@@ -464,6 +465,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                                         delay,
                                     });
                                 }
+                                inserted = true;
                             },
                         }
                     } else {
@@ -519,6 +521,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                             action: ActionType::Loop(loop_frames, count),
                             delay,
                         });
+                        inserted = true;
                     } else {
                         println!("Warning: Loop end found without loop, skipping");
                     }
@@ -580,10 +583,23 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                             ActionType::Loop(_, _) => unreachable!(),
                         }
                     } else {
-                        frames.push(MacroFrame {
-                            action: ActionType::KeyDown(key),
-                            delay,
-                        });
+                        let action = ActionType::KeyDown(key);
+                        let delay = Some(Duration::ZERO);
+
+                        if let Some((frames, loop_count)) = current_loop.as_mut() {
+                            if *loop_count == 1 {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay,
+                                });
+                            }
+                        } else {
+                            frames.push(MacroFrame {
+                                action,
+                                delay,
+                            });
+                        }
+                        inserted = true;
                     }
 
                     i += 2;
@@ -614,10 +630,23 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                             ActionType::Loop(_, _) => unreachable!(),
                         }
                     } else {
-                        frames.push(MacroFrame {
-                            action: ActionType::KeyUp(key),
-                            delay,
-                        });
+                        let action = ActionType::KeyUp(key);
+                        let delay = Some(Duration::ZERO);
+                        
+                        if let Some((frames, loop_count)) = current_loop.as_mut() {
+                            if *loop_count == 1 {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay,
+                                });
+                            }
+                        } else {
+                            frames.push(MacroFrame {
+                                action,
+                                delay,
+                            });
+                        }
+                        inserted = true;
                     }
 
                     i += 2;
@@ -683,10 +712,23 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                             _ => println!("Warning: Set LED found in string or chord, skipping"),
                         }
                     } else {
-                        frames.push(MacroFrame {
-                            action: ActionType::SetLed((r, g, b)),
-                            delay,
-                        });
+                        let action = ActionType::SetLed((r, g, b));
+                        let delay = Some(Duration::ZERO);
+                        
+                        if let Some((frames, loop_count)) = current_loop.as_mut() {
+                            if *loop_count == 1 {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay,
+                                });
+                            }
+                        } else {
+                            frames.push(MacroFrame {
+                                action,
+                                delay,
+                            });
+                        }
+                        inserted = true;
                     }
 
                     i += 4;
@@ -703,10 +745,23 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                             _ => println!("Warning: Clear LED found in string or chord, skipping"),
                         }
                     } else {
-                        frames.push(MacroFrame {
-                            action: ActionType::ClearLed,
-                            delay,
-                        });
+                        let action = ActionType::ClearLed;
+                        let delay = Some(Duration::ZERO);
+                        
+                        if let Some((frames, loop_count)) = current_loop.as_mut() {
+                            if *loop_count == 1 {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay,
+                                });
+                            }
+                        } else {
+                            frames.push(MacroFrame {
+                                action,
+                                delay,
+                            });
+                        }
+                        inserted = true;
                     }
 
                     i += 1;
@@ -746,11 +801,31 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 ActionType::Loop(_, _) => unreachable!(),
             }
         } else {
-            if delay.is_some() {
-                frames.push(MacroFrame {
-                    action: ActionType::Empty,
-                    delay,
-                });
+            if inserted {
+                if let Some((frames, loop_count)) = current_loop.as_mut() {
+                    if *loop_count == 1 {
+                        frames.last_mut().unwrap().delay = delay;
+                    }
+                } else {
+                    frames.last_mut().unwrap().delay = delay;
+                }
+            } else {
+                let action = ActionType::Empty;
+                let delay = Some(Duration::ZERO);
+                
+                if let Some((frames, loop_count)) = current_loop.as_mut() {
+                    if *loop_count == 1 {
+                        frames.push(MacroFrame {
+                            action,
+                            delay,
+                        });
+                    }
+                } else {
+                    frames.push(MacroFrame {
+                        action,
+                        delay,
+                    });
+                }
             }
         }
         
