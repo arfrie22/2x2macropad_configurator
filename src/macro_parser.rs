@@ -4,26 +4,27 @@ use hidapi::HidDevice;
 use macropad_protocol::{macro_protocol::{MacroCommand, MacroSectionAnnotation}, data_protocol::{KeyMode, LedEffect}};
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
-use crate::macropad_wrapper::{self, prime_device};
+use crate::{macropad_wrapper::{self, prime_device}, type_wrapper};
+
 
 #[derive(Debug, Clone)]
-enum ActionType {
+pub enum ActionType {
     Action(Vec<MacroAction>),
-    String(String, Duration),
-    Chord(Vec<Keyboard>, Duration),
+    String(String, Option<Duration>),
+    Chord(Vec<Keyboard>, Option<Duration>),
     Loop(Vec<MacroFrame>, u8),
 }
 
 #[derive(Debug, Clone)]
 pub struct MacroFrame {
-    pub action_type: ActionType,
+    pub action: ActionType,
     pub delay: Option<Duration>,
 }
 
 impl Default for MacroFrame {
     fn default() -> Self {
         Self {
-            action_type: ActionType::Action(vec![]),
+            action: ActionType::Action(vec![]),
             delay: None,
         }
     }
@@ -231,27 +232,133 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
 
     let mut i = 0;
     let mut command = MacroCommand::from(data[i]);
+
+    let mut current_loop = None;
+    let mut action = ActionType::Action(Vec::new());
+    let mut last_delay = None;
+    let mut caps = false;
+    let mut current_string = "".to_string();
+    let mut keys = Vec::new();
+    let mut delay = None;
+        
+
     while command != MacroCommand::CommandTerminator {
-        let mut actions = Vec::new();
-        let mut delay = None;
+        
+
+        while command == MacroCommand::CommandSectionAnnotation {
+            let annotation = MacroSectionAnnotation::from(data[i + 1]);
+            match annotation {
+                MacroSectionAnnotation::None => {
+                    match &action {
+                        ActionType::Action(_) => {
+                            println!("Warning: Don't need to specify None annotation");
+                        },
+                        ActionType::String(_, d) => {
+                            let delta = {
+                                if let Some(delay) = delay {
+                                    if let Some(d) = d {
+                                        if delay > *d {
+                                            Some(delay - *d)
+                                        } else {
+                                            Some(delay)
+                                        }
+                                    } else {
+                                        Some(delay)
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            if let Some((frames, loop_count)) = current_loop.as_mut() {
+                                if *loop_count == 1 {
+                                    frames.push(MacroFrame {
+                                        action,
+                                        delay: delta,
+                                    });
+                                }
+                            } else {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay: delta,
+                                });
+                            }
+                            
+
+                            action = ActionType::Action(Vec::new());
+                        },
+                        ActionType::Chord(k, d) => {
+                            if let Some((frames, loop_count)) = current_loop.as_mut() {
+                                if *loop_count == 1 {
+                                    frames.push(MacroFrame {
+                                        action,
+                                        delay,
+                                    });
+                                }
+                            } else {
+                                frames.push(MacroFrame {
+                                    action,
+                                    delay,
+                                });
+                            }
+
+                            action = ActionType::Action(Vec::new());
+                        },
+
+                        ActionType::Loop(_, _) => unreachable!(),
+                    }
+                },
+                MacroSectionAnnotation::String => {
+                    if let ActionType::Action(_) = action {
+                        action = ActionType::String("".to_string(), None);
+                        caps = false;
+                    } else {
+                        println!("Warning: action already set, skipping string");
+                    }  
+                },
+                MacroSectionAnnotation::Chord => {
+                    if let ActionType::Action(_) = action {
+                        action = ActionType::Chord(Vec::new(), None);
+                    } else {
+                        println!("Warning: action already set, skipping chord");
+                    }  
+                },
+                MacroSectionAnnotation::LoopBegin => {
+                    if current_loop.is_some() {
+                        println!("Warning: Nested loop found, skipping");
+                    } else {
+                        current_loop = Some((Vec::new(), 1));
+                    }
+                },
+                MacroSectionAnnotation::LoopIteration => {
+                    if let Some((_, count)) = &mut current_loop {
+                        *count += 1;
+                    } else {
+                        println!("Warning: Loop iteration found without loop, skipping");
+                    }
+                },
+                MacroSectionAnnotation::LoopEnd => {
+                    if let Some((frames, count)) = current_loop.take() {
+                        frames.push(MacroFrame {
+                            action: ActionType::Loop(frames, count),
+                            delay,
+                        });
+                    } else {
+                        println!("Warning: Loop end found without loop, skipping");
+                    }
+                },
+            }
+            i += 2;
+            command = MacroCommand::from(data[i]);
+        }
+
+        delay = None;
+
         while command != MacroCommand::CommandTerminator {
             match command {
                 MacroCommand::CommandSectionAnnotation => {
-                    if !actions.is_empty() {
-                        println!("Warning: Section annotation found in the middle of a macro, skipping");
-                        i += 2;
-                    } else {
-                        let annotation = MacroSectionAnnotation::from(data[i + 1]);
-                        match annotation {
-                            MacroSectionAnnotation::None => {
-                                println!("Warning: Section annotation found with no annotation, skipping");
-                                i += 2;
-                            },
-                            MacroSectionAnnotation::String => {},
-                            MacroSectionAnnotation::Chord => todo!(),
-                        }
-                    }
-                    
+                    println!("Warning: Section annotation found in command section, skipping");
+                    i += 2;
                 }
                 MacroCommand::CommandDelay => {
                     let delay_bytes = [data[i + 1], data[i + 2], data[i + 3], data[i + 4]];
@@ -261,38 +368,116 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 }
                 MacroCommand::CommandPressKey => {
                     let key = Keyboard::from(data[i + 1]);
-                    actions.push(MacroAction::PressKey(key));
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::PressKey(key));
+                        },
+                        ActionType::String(string, _) => {
+                            if key == Keyboard::LeftShift || key == Keyboard::RightShift {
+                                caps = true;
+                            } else {
+                                string.push(type_wrapper::KeyboardWrapper::from(key).get_char(caps));
+                            }
+                        },
+                        ActionType::Chord(keys, _) => {
+                            keys.push(key);
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                    }
+
                     i += 2;
                 }
                 MacroCommand::CommandReleaseKey => {
                     let key = Keyboard::from(data[i + 1]);
-                    actions.push(MacroAction::ReleaseKey(key));
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::ReleaseKey(key));
+                        },
+                        ActionType::String(string, _) => {
+                            if key == Keyboard::LeftShift || key == Keyboard::RightShift {
+                                caps = false;
+                            }
+                        },
+                        ActionType::Chord(keys, _) => {
+                            // Nothing is needed here
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                    }
+
                     i += 2;
                 }
                 MacroCommand::CommandConsumer => {
                     let key = Consumer::from(u16::from_le_bytes([data[i + 1], data[i + 2]]));
-                    actions.push(MacroAction::Consumer(key));
+
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::Consumer(key));
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                        _ => println!("Warning: Consumer key found in string or chord, skipping"),
+                    }
+
                     i += 3;
                 }
                 MacroCommand::CommandSetLed => {
                     let r = data[i + 1];
                     let g = data[i + 2];
                     let b = data[i + 3];
-                    actions.push(MacroAction::SetLed((r, g, b)));
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::SetLed((r, g, b)));
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                        _ => println!("Warning: Set LED found in string or chord, skipping"),
+                    }
+
                     i += 4;
                 }
                 MacroCommand::CommandClearLed => {
-                    actions.push(MacroAction::ClearLed);
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::ClearLed);
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                        _ => println!("Warning: Clear LED found in string or chord, skipping"),
+                    }
+
                     i += 1;
                 }
                 _ => {}
             }
             command = MacroCommand::from(data[i]);
         }
-        frames.push(MacroFrame {
-            actions,
-            delay,
-        });
+
+        match &mut action {
+            ActionType::Action(_) => {
+                if let Some((frames, loop_count)) = current_loop.as_mut() {
+                    if *loop_count == 1 {
+                        frames.push(MacroFrame {
+                            action,
+                            delay,
+                        });
+                    }
+                } else {
+                    frames.push(MacroFrame {
+                        action: action,
+                        delay,
+                    });
+                }
+            },
+            ActionType::String(_, key_delay) => {
+                if key_delay.is_none() {
+                    *key_delay = delay;
+                }
+            },
+            ActionType::Chord(_, key_delay) => {
+                if key_delay.is_none() {
+                    *key_delay = delay;
+                }
+            },
+            ActionType::Loop(_, _) => unreachable!(),
+        }
+        
         i += 1;
         command = MacroCommand::from(data[i]);
     }
@@ -313,58 +498,15 @@ impl Macro {
         self.frames.push(frame);
     }
 
-    pub fn pack(&self) -> [u8; 4092] {
+    pub fn pack(&self) -> Result<[u8; 4092], ()> {
         let mut data = [0; 4092];
 
         let mut i = 0;
         for frame in self.frames.iter() {
-            for action in frame.actions.iter() {
-                match action {
-                    MacroAction::PressKey(key) => {
-                        data[i] = MacroCommand::CommandPressKey as u8;
-                        data[i + 1] = *key as u8;
-                        i += 2;
-                    },
-                    MacroAction::ReleaseKey(key) => {
-                        data[i] = MacroCommand::CommandReleaseKey as u8;
-                        data[i + 1] = *key as u8;
-                        i += 2;
-                    },
-                    MacroAction::Consumer(consumer) => {
-                        data[i] = MacroCommand::CommandConsumer as u8;
-                        let consumer_bytes = (*consumer as u16).to_le_bytes();
-                        data[i + 1] = consumer_bytes[0];
-                        data[i + 2] = consumer_bytes[1];
-                        i += 3;
-                    },
-                    MacroAction::SetLed(key) => {
-                        data[i] = MacroCommand::CommandSetLed as u8;
-                        data[i + 1] = key.0;
-                        data[i + 2] = key.1;
-                        data[i + 3] = key.2;
-                        i += 4;
-                    },
-                    MacroAction::ClearLed => {
-                        data[i] = MacroCommand::CommandClearLed as u8;
-                        i += 1;
-                    },
-                }
-            }
-
-            if let Some(delay) = frame.delay {
-                data[i] = MacroCommand::CommandDelay as u8;
-                let delay_bytes = delay.as_micros().to_le_bytes();
-                data[i + 1] = delay_bytes[0];
-                data[i + 2] = delay_bytes[1];
-                data[i + 3] = delay_bytes[2];
-                data[i + 4] = delay_bytes[3];
-                i += 5;
-            }
-
-            data[i] = MacroCommand::CommandTerminator as u8;
-            i += 1;
+            
+            
         }
 
-        data
+        Ok(data)
     }
 }
