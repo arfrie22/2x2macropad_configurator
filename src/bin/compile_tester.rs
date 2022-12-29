@@ -22,18 +22,25 @@ fn main() {
             macropad_wrapper::set_key_mode(&d, 0, KeyMode::ConsumerMode).unwrap();
 
             let mut mac = Macro::new();
-            mac.add_frame(MacroFrame::from(vec![MacroAction::SetLed((255, 0 ,0)), MacroAction::PressKey(Keyboard::A)], Some(Duration::from_millis(200))));
-            mac.add_frame(MacroFrame::from(vec![MacroAction::ReleaseKey(Keyboard::A)], None));
+            // mac.add_frame(MacroFrame::from(vec![MacroAction::SetLed((255, 0 ,0)), MacroAction::PressKey(Keyboard::A)], Some(Duration::from_millis(200))));
+            // mac.add_frame(MacroFrame::from(vec![MacroAction::ReleaseKey(Keyboard::A)], None));
 
-            let macro_data = mac.pack();
+            mac.add_frame(
+                MacroFrame { action: macro_parser::ActionType::String("This is a test".to_string(), Some(Duration::from_millis(30))), delay: None }
+            );
+
+            let macro_data = mac.pack().unwrap();
             
             macropad_wrapper::set_led_base_color(&d, (255, 0, 0)).unwrap();
             macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
             macropad_wrapper::set_led_effect_period(&d, 5.0).unwrap();
 
-            macropad_wrapper::clear_macro(&d, 0).unwrap();
-            macropad_wrapper::set_macro(&d, 0, &macro_data).unwrap();
-            macropad_wrapper::validate_macro(&d, 0, &macro_data).unwrap();
+
+            println!("In\n{:?}", macro_data);
+            macropad_wrapper::clear_macro(&d, 4).unwrap();
+            macropad_wrapper::set_macro(&d, 4, &macro_data).unwrap();
+            println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
+            macropad_wrapper::validate_macro(&d, 4, &macro_data).unwrap();
             
 
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
