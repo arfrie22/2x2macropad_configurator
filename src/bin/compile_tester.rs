@@ -80,13 +80,13 @@ fn main() {
             macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
             macropad_wrapper::set_led_effect_period(&d, 5.0).unwrap();
 
-            println!("Macro data: {:?}", parse_macro(&macro_data));
-            println!("In\n{:?}", macro_data);
+            // println!("Macro data: {:?}", parse_macro(&macro_data));
+            // println!("In\n{:?}", macro_data);
             macropad_wrapper::clear_macro(&d, 4).unwrap();
             macropad_wrapper::set_macro(&d, 4, &macro_data).unwrap();
             let mut macro_d_2 = [0u8; 4092];
             macropad_wrapper::set_macro(&d, 4, &macro_d_2).unwrap();
-            println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
+            // println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
             // macro_data[1] = 0x00;
             macropad_wrapper::validate_macro(&d, 4, &macro_data).unwrap();
 

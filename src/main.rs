@@ -24,17 +24,17 @@ use usbd_human_interface_device::page::{Keyboard, Consumer};
 
 const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
-    bytes: include_bytes!("../../assets/fonts/Roboto-Regular.ttf"),
+    bytes: include_bytes!("../assets/fonts/Roboto-Regular.ttf"),
 };
 
 const ROBOTO_BOLD: Font = iced::Font::External {
     name: "Roboto Bold",
-    bytes: include_bytes!("../../assets/fonts/Roboto-Bold.ttf"),
+    bytes: include_bytes!("../assets/fonts/Roboto-Bold.ttf"),
 };
 
 const ICON_FONT: Font = iced::Font::External {
     name: "Icons",
-    bytes: include_bytes!("../../assets/fonts/remixicon.ttf"),
+    bytes: include_bytes!("../assets/fonts/remixicon.ttf"),
 };
 
 const ACTION_DELAY: u64 = 200;

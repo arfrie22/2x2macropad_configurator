@@ -3,7 +3,7 @@ name = "macropad_configurator"
 version = "0.1.0"
 edition = "2021"
 description = "A"
-default-run = "main"
+default-run = "macropad_configurator"
 
 [package.metadata.bundle]
 name = "Macropad Configurator"
