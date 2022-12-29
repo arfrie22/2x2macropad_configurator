@@ -566,7 +566,7 @@ impl Application for Configurator {
                 };
 
                 
-                
+                let selected_key_mode = Some(self.key_tab.key_configs[*i].key_mode);
                 let message = column![
                     container(
                         row![
@@ -586,13 +586,13 @@ impl Application for Configurator {
                         container(column![
                             text("Key Mode").font(ROBOTO).size(30),
                             row![
-                                radio("Macro Mode", macropad_protocol::data_protocol::KeyMode::MacroMode, None, Message::KeyModeChanged),
+                                radio("Macro Mode", macropad_protocol::data_protocol::KeyMode::MacroMode, selected_key_mode, Message::KeyModeChanged),
                                 Space::with_width(Length::Units(20)),
-                                radio("Single Tap Mode", macropad_protocol::data_protocol::KeyMode::SingleTapMode, None, Message::KeyModeChanged),
+                                radio("Single Tap Mode", macropad_protocol::data_protocol::KeyMode::SingleTapMode, selected_key_mode, Message::KeyModeChanged),
                                 Space::with_width(Length::Units(20)),
-                                radio("Keyboard Mode", macropad_protocol::data_protocol::KeyMode::KeyboardMode, None, Message::KeyModeChanged),
+                                radio("Keyboard Mode", macropad_protocol::data_protocol::KeyMode::KeyboardMode, selected_key_mode, Message::KeyModeChanged),
                                 Space::with_width(Length::Units(20)),
-                                radio("Consumer Mode", macropad_protocol::data_protocol::KeyMode::ConsumerMode, None, Message::KeyModeChanged),
+                                radio("Consumer Mode", macropad_protocol::data_protocol::KeyMode::ConsumerMode, selected_key_mode, Message::KeyModeChanged),
                             ],
                         ])
                         .padding(Padding {
