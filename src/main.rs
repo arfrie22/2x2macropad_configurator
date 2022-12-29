@@ -33,7 +33,7 @@ const ROBOTO_BOLD: Font = iced::Font::External {
 };
 
 const ICON_FONT: Font = iced::Font::External {
-    name: "Icons",
+    name: "Remix Icon", // Can not be icons otherwise it conflicts with the default icon font
     bytes: include_bytes!("../assets/fonts/remixicon.ttf"),
 };
 
