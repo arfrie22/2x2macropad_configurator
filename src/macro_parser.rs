@@ -35,6 +35,13 @@ impl MacroFrame {
         Self::default()
     }
 
+    pub fn from(action: Vec<MacroAction>, delay: Option<Duration>) -> Self {
+        Self {
+            action: ActionType::Action(action),
+            delay,
+        }
+    }
+
     pub fn pack(&self) -> Vec<u8> {
         let mut output = Vec::new();
 
@@ -68,7 +75,7 @@ impl MacroFrame {
 
                 if let Some(delay) = &self.delay {
                     output.push(MacroCommand::CommandDelay as u8);
-                    output.extend_from_slice(&delay.as_micros().to_le_bytes());
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                 }
     
                 output.push(MacroCommand::CommandTerminator as u8);
@@ -77,7 +84,7 @@ impl MacroFrame {
                 output.push(MacroCommand::CommandSectionAnnotation as u8);
                 output.push(MacroSectionAnnotation::String as u8);
 
-                let caps = false;
+                let mut caps = false;
                 for (i, char) in string.chars().enumerate() {
                     let (key, caps_status) = type_wrapper::KeyboardWrapper::from_char(char);
                     if let Some(caps_status) = caps_status {
@@ -88,34 +95,43 @@ impl MacroFrame {
                                     MacroCommand::CommandReleaseKey
                                 } as u8);
                             output.push(Keyboard::LeftShift as u8);
+                            caps = true;
                         }
                     }
 
                     output.push(MacroCommand::CommandPressKey as u8);
                     output.push(key as u8);
 
-                    if i == string.len() - 1 {
-                        if let Some(delay) = &self.delay {
-                            output.push(MacroCommand::CommandDelay as u8);
-                            output.extend_from_slice(&delay.as_micros().to_le_bytes());
-                        }
-                    } else if let Some(delay) = delay {
+                    if let Some(delay) = delay {
                         output.push(MacroCommand::CommandDelay as u8);
-                        output.extend_from_slice(&delay.as_micros().to_le_bytes());
+                        output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                     }
 
                     output.push(MacroCommand::CommandTerminator as u8);
 
                     output.push(MacroCommand::CommandReleaseKey as u8);
                     output.push(key as u8);
+
+                    if i == string.len() - 1 {
+                        if let Some(delay) = &self.delay {
+                            output.push(MacroCommand::CommandDelay as u8);
+                            output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                        }
+                    } else if let Some(delay) = delay {
+                        output.push(MacroCommand::CommandDelay as u8);
+                        output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                    }
+
+                    output.push(MacroCommand::CommandTerminator as u8);
                 }
                 
-                output.push(MacroCommand::CommandTerminator as u8);
-
                 output.push(MacroCommand::CommandSectionAnnotation as u8);
                 output.push(MacroSectionAnnotation::None as u8);
             },
             ActionType::Chord(keys, delay) => {
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::Chord as u8);
+
                 for key in keys {
                     output.push(MacroCommand::CommandPressKey as u8);
                     output.push(*key as u8);
@@ -123,8 +139,10 @@ impl MacroFrame {
 
                 if let Some(delay) = delay {
                     output.push(MacroCommand::CommandDelay as u8);
-                    output.extend_from_slice(&delay.as_micros().to_le_bytes());
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                 }
+
+                output.push(MacroCommand::CommandTerminator as u8);
 
                 for key in keys {
                     output.push(MacroCommand::CommandReleaseKey as u8);
@@ -133,8 +151,13 @@ impl MacroFrame {
 
                 if let Some(delay) = &self.delay {
                     output.push(MacroCommand::CommandDelay as u8);
-                    output.extend_from_slice(&delay.as_micros().to_le_bytes());
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                 }
+
+                output.push(MacroCommand::CommandTerminator as u8);
+
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::None as u8);
             },
             ActionType::Loop(frames, count) => {
                 let mut packed_frames = Vec::new();
@@ -361,6 +384,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
     let mut action = ActionType::Action(Vec::new());
     let mut caps = false;
     let mut delay = None;
+    let mut done = false;
         
 
     while command != MacroCommand::CommandTerminator {
@@ -469,6 +493,15 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
             }
             i += 2;
             command = MacroCommand::from(data[i]);
+
+            if command == MacroCommand::CommandTerminator {
+                done = true;
+                break;
+            }
+        }
+
+        if done {
+            break;
         }
 
         delay = None;
@@ -569,9 +602,18 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
         }
 
         match &mut action {
-            ActionType::Action(_) => {
-                if let Some((frames, loop_count)) = current_loop.as_mut() {
-                    if *loop_count == 1 {
+            ActionType::Action(actions) => {
+                if actions.len() > 0 {
+                    if let Some((frames, loop_count)) = current_loop.as_mut() {
+                        if *loop_count == 1 {
+                            frames.push(MacroFrame {
+                                action,
+                                delay,
+                            });
+
+                            action = ActionType::Action(Vec::new());
+                        }
+                    } else {
                         frames.push(MacroFrame {
                             action,
                             delay,
@@ -580,12 +622,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                         action = ActionType::Action(Vec::new());
                     }
                 } else {
-                    frames.push(MacroFrame {
-                        action,
-                        delay,
-                    });
-
-                    action = ActionType::Action(Vec::new());
+                    println!("Warning: Empty action found, skipping");
                 }
             },
             ActionType::String(_, key_delay) => {
