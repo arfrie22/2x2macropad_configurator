@@ -10,7 +10,7 @@ use async_std::future;
 use std::{fmt, sync::Mutex};
 use std::sync::Arc;
 
-use crate::{macro_parser::{self, MacroAction, LedConfig}, macropad_wrapper};
+use crate::{macro_parser::{self, LedConfig}, macropad_wrapper};
 
 async fn scan_devices(api: &mut HidApi) -> Option<HidDevice> {
     api.refresh_devices().unwrap();
