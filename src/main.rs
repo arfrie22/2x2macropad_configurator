@@ -409,6 +409,7 @@ impl Application for Configurator {
     fn view(&self) -> Element<Message> {
         match &self.state {
             State::Disconnected => {
+                // TODO: Add ability to flash firmware
                 let message = column![
                     text("Disconnected")
                         .font(ROBOTO)
