@@ -27,7 +27,7 @@ fn main() {
 
             // macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
 
-            macropad_wrapper::set_consumer_data(&d, 0, Consumer::Rewind).unwrap();
+            macropad_wrapper::set_consumer_data(&d, 0, Consumer::VolumeIncrement).unwrap();
             // macropad_wrapper::set_keyboard_data(&d, 0, Keyboard).unwrap();
             macropad_wrapper::set_key_mode(&d, 0, KeyMode::ConsumerMode).unwrap();
 
@@ -44,6 +44,19 @@ fn main() {
             //     None,
             // ));
 
+            mac.add_frame(MacroFrame::from(
+                vec![
+                    MacroAction::SetLed((255, 0, 0)),
+                ],
+                Some(Duration::from_millis(200)),
+            ));
+
+            // mac.add_frame(MacroFrame::from(
+            //     vec![
+            //         MacroAction::SetLed((255, 0, 0)),
+            //         MacroAction::Consumer(Consumer::VolumeIncrement),
+            //     ], None));
+
             // mac.add_frame(MacroFrame {
             //     action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
             //     delay: Some(Duration::from_millis(200)),
@@ -58,21 +71,37 @@ fn main() {
             // });
 
             mac.add_frame(MacroFrame {
-                action: ActionType::Loop(vec![
-                    MacroFrame {
-                        action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
-                        delay: Some(Duration::from_millis(200)),
-                    },
-                    MacroFrame {
-                        action: ActionType::String(
-                            "This is a test, lmao".to_string(),
-                            Some(Duration::from_millis(100)),
-                        ),
-                        delay: None,
-                    },
-                ], 3),
-                delay: Some(Duration::from_millis(200)),
+                action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
+                delay: Some(Duration::from_millis(70)),
             });
+
+            
+            mac.add_frame(MacroFrame {
+                action: macro_parser::ActionType::ConsumerPress(Consumer::VolumeIncrement, Some(Duration::from_millis(40))),
+                delay: Some(Duration::from_millis(20)),
+            });
+
+            mac.add_frame(MacroFrame {
+                action: macro_parser::ActionType::KeyPress(Keyboard::A, Some(Duration::from_millis(30))),
+                delay: Some(Duration::from_millis(70)),
+            });
+
+            // mac.add_frame(MacroFrame {
+            //     action: ActionType::Loop(vec![
+            //         MacroFrame {
+            //             action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
+            //             delay: Some(Duration::from_millis(200)),
+            //         },
+            //         MacroFrame {
+            //             action: ActionType::String(
+            //                 "This is a test, lmao".to_string(),
+            //                 Some(Duration::from_millis(100)),
+            //             ),
+            //             delay: None,
+            //         },
+            //     ], 3),
+            //     delay: Some(Duration::from_millis(200)),
+            // });
 
             let macro_data = mac.pack().unwrap();
 
@@ -84,8 +113,6 @@ fn main() {
             // println!("In\n{:?}", macro_data);
             macropad_wrapper::clear_macro(&d, 4).unwrap();
             macropad_wrapper::set_macro(&d, 4, &macro_data).unwrap();
-            let mut macro_d_2 = [0u8; 4092];
-            macropad_wrapper::set_macro(&d, 4, &macro_d_2).unwrap();
             // println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
             // macro_data[1] = 0x00;
             macropad_wrapper::validate_macro(&d, 4, &macro_data).unwrap();

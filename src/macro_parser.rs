@@ -10,6 +10,8 @@ use crate::{macropad_wrapper::{self, prime_device}, type_wrapper};
 #[derive(Debug, Clone)]
 pub enum ActionType {
     Action(Vec<MacroAction>),
+    KeyPress(Keyboard, Option<Duration>),
+    ConsumerPress(Consumer, Option<Duration>),
     String(String, Option<Duration>),
     Chord(Vec<Keyboard>, Option<Duration>),
     Loop(Vec<MacroFrame>, u8),
@@ -61,6 +63,9 @@ impl MacroFrame {
                             output.push(MacroCommand::CommandConsumer as u8);
                             output.extend_from_slice(&(*consumer as u16).to_le_bytes());
                         },
+                        MacroAction::ReleaseConsumer => {
+                            output.push(MacroCommand::CommandReleaseConsumer as u8);
+                        },
                         MacroAction::SetLed(key) => {
                             output.push(MacroCommand::CommandSetLed as u8);
                             output.push(key.0);
@@ -80,6 +85,59 @@ impl MacroFrame {
     
                 output.push(MacroCommand::CommandTerminator as u8);
             },
+            ActionType::KeyPress(key, delay) => {
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::KeyPress as u8);
+
+                output.push(MacroCommand::CommandPressKey as u8);
+                output.push(*key as u8);
+
+                if let Some(delay) = delay {
+                    output.push(MacroCommand::CommandDelay as u8);
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                }
+
+                output.push(MacroCommand::CommandTerminator as u8);
+
+                output.push(MacroCommand::CommandReleaseKey as u8);
+                output.push(*key as u8);
+
+                if let Some(delay) = &self.delay {
+                    output.push(MacroCommand::CommandDelay as u8);
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                }
+
+                output.push(MacroCommand::CommandTerminator as u8);
+
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::None as u8);
+            },
+            ActionType::ConsumerPress(consumer, delay) => {
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::ConsumerPress as u8);
+
+                output.push(MacroCommand::CommandConsumer as u8);
+                output.extend_from_slice(&(*consumer as u16).to_le_bytes());
+
+                if let Some(delay) = delay {
+                    output.push(MacroCommand::CommandDelay as u8);
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                }
+
+                output.push(MacroCommand::CommandTerminator as u8);
+
+                output.push(MacroCommand::CommandReleaseConsumer as u8);
+
+                if let Some(delay) = &self.delay {
+                    output.push(MacroCommand::CommandDelay as u8);
+                    output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
+                }
+
+                output.push(MacroCommand::CommandTerminator as u8);
+
+                output.push(MacroCommand::CommandSectionAnnotation as u8);
+                output.push(MacroSectionAnnotation::None as u8);
+            }
             ActionType::String(string, delay) => {
                 output.push(MacroCommand::CommandSectionAnnotation as u8);
                 output.push(MacroSectionAnnotation::String as u8);
@@ -188,6 +246,7 @@ pub enum MacroAction {
     PressKey(Keyboard),
     ReleaseKey(Keyboard),
     Consumer(Consumer),
+    ReleaseConsumer,
     SetLed((u8, u8, u8)),
     ClearLed,
 }
@@ -396,41 +455,8 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                         ActionType::Action(_) => {
                             println!("Warning: Don't need to specify None annotation");
                         },
-                        ActionType::String(_, d) => {
-                            let delta = {
-                                if let Some(delay) = delay {
-                                    if let Some(d) = d {
-                                        if delay > *d {
-                                            Some(delay - *d)
-                                        } else {
-                                            Some(delay)
-                                        }
-                                    } else {
-                                        Some(delay)
-                                    }
-                                } else {
-                                    None
-                                }
-                            };
-
-                            if let Some((frames, loop_count)) = current_loop.as_mut() {
-                                if *loop_count == 1 {
-                                    frames.push(MacroFrame {
-                                        action,
-                                        delay: delta,
-                                    });
-                                }
-                            } else {
-                                frames.push(MacroFrame {
-                                    action,
-                                    delay: delta,
-                                });
-                            }
-                            
-
-                            action = ActionType::Action(Vec::new());
-                        },
-                        ActionType::Chord(k, d) => {
+                        ActionType::Loop(_, _) => unreachable!(),
+                        _ => {
                             if let Some((frames, loop_count)) = current_loop.as_mut() {
                                 if *loop_count == 1 {
                                     frames.push(MacroFrame {
@@ -447,8 +473,20 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
 
                             action = ActionType::Action(Vec::new());
                         },
-
-                        ActionType::Loop(_, _) => unreachable!(),
+                    }
+                },
+                MacroSectionAnnotation::KeyPress => {
+                    if let ActionType::Action(_) = &action {
+                        action = ActionType::KeyPress(Keyboard::NoEventIndicated, None);
+                    } else {
+                        println!("Warning: action already set, skipping keypress");
+                    }
+                },
+                MacroSectionAnnotation::ConsumerPress => {
+                    if let ActionType::Action(_) = &action {
+                        action = ActionType::ConsumerPress(Consumer::Unassigned, None);
+                    } else {
+                        println!("Warning: action already set, skipping consumerpress");
                     }
                 },
                 MacroSectionAnnotation::String => {
@@ -524,6 +562,12 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                         ActionType::Action(actions) => {
                             actions.push(MacroAction::PressKey(key));
                         },
+                        ActionType::KeyPress(keypress, _) => {
+                            *keypress = key;
+                        },
+                        ActionType::ConsumerPress(_, _) => {
+                            println!("Warning: Press Key when annotation is Consumer Press, skipping");
+                        },
                         ActionType::String(string, _) => {
                             if key == Keyboard::LeftShift || key == Keyboard::RightShift {
                                 caps = true;
@@ -545,12 +589,18 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                         ActionType::Action(actions) => {
                             actions.push(MacroAction::ReleaseKey(key));
                         },
-                        ActionType::String(string, _) => {
+                        ActionType::KeyPress(_, _) => {
+                            // Nothing is needed here
+                        },
+                        ActionType::ConsumerPress(_, _) => {
+                            println!("Warning: Release Key when annotation is Consumer Press, skipping");
+                        },
+                        ActionType::String(_, _) => {
                             if key == Keyboard::LeftShift || key == Keyboard::RightShift {
                                 caps = false;
                             }
                         },
-                        ActionType::Chord(keys, _) => {
+                        ActionType::Chord(_, _) => {
                             // Nothing is needed here
                         },
                         ActionType::Loop(_, _) => unreachable!(),
@@ -565,11 +615,32 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                         ActionType::Action(actions) => {
                             actions.push(MacroAction::Consumer(key));
                         },
+                        ActionType::ConsumerPress(consumer, _) => {
+                            if key == Consumer::Unassigned {
+                                println!("Warning: Consumer key is unassigned, skipping");
+                            } else {
+                                *consumer = key;
+                            }
+                        },
                         ActionType::Loop(_, _) => unreachable!(),
-                        _ => println!("Warning: Consumer key found in string or chord, skipping"),
+                        _ => println!("Warning: Consumer key found in keypress, string, or chord, skipping"),
                     }
 
                     i += 3;
+                }
+                MacroCommand::CommandReleaseConsumer => {
+                    match &mut action {
+                        ActionType::Action(actions) => {
+                            actions.push(MacroAction::ReleaseConsumer);
+                        },
+                        ActionType::ConsumerPress(_, _) => {
+                            // Nothing is needed here
+                        },
+                        ActionType::Loop(_, _) => unreachable!(),
+                        _ => println!("Warning: Release Consumer found in keypress, string, or chord, skipping"),
+                    }
+
+                    i += 1;
                 }
                 MacroCommand::CommandSetLed => {
                     let r = data[i + 1];
@@ -623,6 +694,16 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                     }
                 } else {
                     println!("Warning: Empty action found, skipping");
+                }
+            },
+            ActionType::KeyPress(_, key_delay) => {
+                if key_delay.is_none() {
+                    *key_delay = delay;
+                }
+            },
+            ActionType::ConsumerPress(_, key_delay) => {
+                if key_delay.is_none() {
+                    *key_delay = delay;
                 }
             },
             ActionType::String(_, key_delay) => {
