@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use iced::subscription::{events, events_with};
+use iced::theme::Button;
 use iced::widget::{
     button, column, container, pane_grid, pick_list, progress_bar, row, slider, text, text_input,
     Column, Container, Row, Space, Text, radio,
@@ -1155,74 +1156,81 @@ impl Tab for SettingsTab {
     }
 
     fn content(&self) -> Element<'_, Self::Message> {
+        
         let message = column![
+            container(button(
+                text(char::from(match self.theme {
+                    Theme::Light => Icon::Sun,
+                    Theme::Dark => Icon::Moon,
+                    _ => Icon::Sun,
+                }))
+                .font(ICON_FONT)
+                .size(30)
+                
+            )
+            .on_press(Message::SwitchTheme)
+            .style(Button::Text)
+            ).width(Length::Fill).align_x(alignment::Horizontal::Right).align_y(alignment::Vertical::Top),
+            // container(column![
+            //     text("Theme").font(ROBOTO).size(30),
+                
+            // ])
+            // .padding(Padding {
+            //     top: 20,
+            //     right: 0,
+            //     bottom: 20,
+            //     left: 0,
+            // }),
             container(column![
-                text("Theme").font(ROBOTO).size(30),
-                button(
-                    text(char::from(match self.theme {
-                        Theme::Light => Icon::Sun,
-                        Theme::Dark => Icon::Moon,
-                        _ => Icon::Sun,
-                    }))
-                    .font(ICON_FONT)
-                    .size(30)
-                )
-                .on_press(Message::SwitchTheme)
-            ])
-            .padding(Padding {
-                top: 20,
-                right: 0,
-                bottom: 20,
-                left: 0,
-            }),
-            container(column![
-                text("Press Time (ms)").font(ROBOTO).size(30),
-                text_input(
-                    (self.config.tap_speed / 1000).to_string().as_str(),
-                    self.press_time_text.as_str(),
-                    Message::PressTimeChangedText
-                )
-                .font(ROBOTO)
-                .width(Length::Units(50)),
-            ])
-            .padding(Padding {
-                top: 20,
-                right: 0,
-                bottom: 20,
-                left: 0,
-            }),
-            container(column![
-                text("Hold Time (ms)").font(ROBOTO).size(30),
-                text_input(
-                    (self.config.hold_speed / 1000).to_string().as_str(),
-                    self.hold_time_text.as_str(),
-                    Message::HoldTimeChangedText
-                )
-                .font(ROBOTO)
-                .width(Length::Units(50)),
-            ])
-            .padding(Padding {
-                top: 20,
-                right: 0,
-                bottom: 20,
-                left: 0,
-            }),
-            container(column![
-                text("Default Delay (ms)").font(ROBOTO).size(30),
-                text_input(
-                    (self.config.default_delay / 1000).to_string().as_str(),
-                    self.default_delay_text.as_str(),
-                    Message::DefaultDelayChangedText
-                )
-                .font(ROBOTO)
-                .width(Length::Units(50)),
-            ])
-            .padding(Padding {
-                top: 20,
-                right: 0,
-                bottom: 20,
-                left: 0,
-            }),
+                container(column![
+                    text("Press Time (ms)").font(ROBOTO).size(30),
+                    text_input(
+                        (self.config.tap_speed / 1000).to_string().as_str(),
+                        self.press_time_text.as_str(),
+                        Message::PressTimeChangedText
+                    )
+                    .font(ROBOTO)
+                    .width(Length::Units(50)),
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+                container(column![
+                    text("Hold Time (ms)").font(ROBOTO).size(30),
+                    text_input(
+                        (self.config.hold_speed / 1000).to_string().as_str(),
+                        self.hold_time_text.as_str(),
+                        Message::HoldTimeChangedText
+                    )
+                    .font(ROBOTO)
+                    .width(Length::Units(50)),
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+                container(column![
+                    text("Default Delay (ms)").font(ROBOTO).size(30),
+                    text_input(
+                        (self.config.default_delay / 1000).to_string().as_str(),
+                        self.default_delay_text.as_str(),
+                        Message::DefaultDelayChangedText
+                    )
+                    .font(ROBOTO)
+                    .width(Length::Units(50)),
+                ])
+                .padding(Padding {
+                    top: 20,
+                    right: 0,
+                    bottom: 20,
+                    left: 0,
+                }),
+            ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(20),
         ];
 
         container(message)
