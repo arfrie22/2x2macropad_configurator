@@ -117,14 +117,15 @@ impl Application for Configurator {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::EditorMessage(macro_editor::Message::MoveFrame(old_index, new_index)) => {
-                // index.move_in_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                index.move_in_macro(new_index, &mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
                 index.remove_from_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
-            Message::EditorMessage(macro_editor::Message::AddFrame(frame)) => {
+            Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
+                index.add_to_macro(frame, &mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::SelectFrame(index)) => {
@@ -244,6 +245,7 @@ impl Application for Configurator {
                         },
                     };
                     self.key_tab.editor_actions = macro_editor::MacroAction::from_macro(&self.key_tab.active_macro);
+                    self.key_tab.editor.request_redraw();
 
                     self.state = State::Connected(
                         con.clone(),
@@ -626,6 +628,7 @@ impl Application for Configurator {
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
                 let message = column![
                     text(format!("Edit {:?} Macro {:?}", macro_type, i)).font(ROBOTO).size(60),
+                    button("Back").on_press(Message::ButtonPressed(*i)),
                     self.key_tab.editor.view(&self.key_tab.editor_actions.as_slice()).map(Message::EditorMessage),
                 ];
 
@@ -639,6 +642,7 @@ impl Application for Configurator {
                 // todo!()
             }
         }
+        
     }
 
     fn theme(&self) -> Theme {
