@@ -37,6 +37,14 @@ impl Index {
         }
     }
 
+    pub fn get_index(&self) -> usize {
+        match self {
+            Index::ImaginaryIndex { parent_index, .. } => parent_index.get_index(),
+            Index::Index { index, .. } => *index,
+            Index::Nested { index, .. } => *index,
+        }
+    }
+
     pub fn get_root_action_index(&self) -> usize {
         match self {
             Index::ImaginaryIndex { parent_index, .. } => parent_index.get_root_action_index(),
@@ -91,42 +99,55 @@ impl Index {
         close_button_bounds.contains(Point::ORIGIN + offset)
     }
 
-    // Just remove it from the list the iterate though and change all the indexes correctly
-    // Have a coutner to keep track of the nested count in a stack as well as the index
+    pub fn remove_from_macro(&self, macro_: &mut Macro, actions: &mut Vec<MacroAction>) {
+        match self {
+            Index::ImaginaryIndex { action_index, parent_index } => unreachable!(),
+            Index::Index { action_index, index } => {
+                let frame = macro_.frames.remove(*index);
+                
+                if let macro_parser::ActionType::Loop(_, _) = frame.action {
+                    let loop_actions = MacroAction::get_loop(actions.as_slice(), self);
+                    for _ in loop_actions {
+                        actions.remove(*action_index);
+                    }
+                } else {
+                    actions.remove(*action_index);
+                }
+            },
+            Index::Nested { action_index, index, parents } => {
+                let mut parents = parents.clone();
+                let mut pointer = macro_.frames.get_mut(parents.remove(0).get_index()).unwrap();
+                while !parents.is_empty() {
+                    pointer = match &mut pointer.action {
+                        macro_parser::ActionType::Loop(frames, _) => {
+                            frames.get_mut(parents.remove(0).get_index()).unwrap()
+                        },
 
-    // pub fn remove_from_macro_actions(&self, macro_: &mut Macro, actions: &mut Vec<MacroAction>) {
-    //     match self {
-    //         Index::Index { action_index, index } => {
-    //             macro_.frames.remove(*index);
-    //             let outer_index = *action_index;
-    //             for action in actions.iter_mut() {
-    //                 match &mut action.index {
-    //                     Index::Index { action_index, index } => {
-    //                         if *action_index > outer_index {
-    //                             *action_index -= 1;
-    //                             *index -= 1;
-    //                         }
-    //                     },
-    //                     Index::Nested { action_index, parent } => {
-    //                         parent.
-    //                         if *action_index > outer_index {
-    //                             *action_index -= 1;
-    //                         }
-    //                     },
-    //                 }
+                        _ => unreachable!(),
+                    };
+                }
 
-    //                 actions.remove(*action_index);
-    //             }
-    //         },
-    //         Index::Nested { action_index, index, parent, .. } => {
-    //             let parent = parent.clone();
-    //             let parent = parent.remove_from_macro(macro_);
-    //             let parent = parent.unwrap();
+                let frame = match &mut pointer.action {
+                    macro_parser::ActionType::Loop(frames, _) => {
+                        frames.remove(*index)
+                    },
 
-    //             macro_.actions[*action_index].frames[*index].nested.remove(parent);
-    //         },
-    //     }
-    // }
+                    _ => unreachable!(),
+                };
+
+                if let macro_parser::ActionType::Loop(_, _) = frame.action {
+                    let loop_actions = MacroAction::get_loop(actions.as_slice(), self);
+                    for _ in loop_actions {
+                        actions.remove(*action_index);
+                    }
+                } else {
+                    actions.remove(*action_index);
+                }
+            },
+        }
+
+        MacroAction::update_action_indexs(actions.iter_mut());
+    }
 
     pub fn new_index(action_index: usize, index: usize) -> Self {
         Index::Index { action_index, index }
@@ -273,7 +294,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                             (None, _) => {
                                 for action in self.actions {
                                     if let Some(offset) = action.index.get_offset(self.state.scroll_offset, cursor_position) {
-                                        if Index::on_close_button(offset) {
+                                        if action.closeable() && Index::on_close_button(offset) {
                                             *state = (None, None);
                                             println!("Close button pressed");
                                             return (event::Status::Captured, Some(Message::RemoveFrame((*action.index).clone())));
@@ -284,7 +305,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                                 match action_type {
                                                     macro_parser::ActionType::Loop(_, _) => {
                                                         *state = (Some(Drag {
-                                                            actions: MacroAction::get_loop(self.actions, action.index.clone()),
+                                                            actions: MacroAction::get_loop(self.actions, action.index.as_ref()),
                                                             drag_offset: offset,
                                                             start_position: cursor_position,
                                                             to: cursor_position,
@@ -302,7 +323,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                                 }
                                             },
                                             ActionWrapper::Imaginary(ImaginaryAction::LoopEnd) => {
-                                                let actions = MacroAction::get_loop(self.actions, action.index.clone());
+                                                let actions = MacroAction::get_loop(self.actions, action.index.as_ref());
                                                 let drag_offset = offset + Vector::new(0.0, (ACTION_SIZE.height + ACTION_PADDING) * (actions.len() - 1) as f32);
                                                 *state = (Some(Drag {
                                                     actions,
@@ -438,7 +459,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 if let Some(cursor_position) = cursor.position_in(&bounds) {
                     for action in self.actions {
                         if let Some(offset) = action.index.get_offset(self.state.scroll_offset, cursor_position) {
-                            if Index::on_close_button(offset) {
+                            if action.closeable() && Index::on_close_button(offset) {
                                 return mouse::Interaction::Pointer;
                             } else {
                                 return mouse::Interaction::Grab;
@@ -516,15 +537,17 @@ impl MacroAction {
             });
     
             // TODO: Will be buggy until iced supports vectorial text https://github.com/iced-rs/iced/pull/1610
-            frame.fill_text(canvas::Text {
-                content: Icon::Close.into(),
-                position: position + Index::CLOSE_BUTTON_OFFSET,
-                color: Color::from_rgb8(0xFF, 0x00, 0x00),
-                size: Index::CLOSE_BUTTON_SIZE.width,
-                font: ICON_FONT,
-                horizontal_alignment: iced::alignment::Horizontal::Left,
-                vertical_alignment: iced::alignment::Vertical::Top,
-            });
+            if self.closeable() {
+                frame.fill_text(canvas::Text {
+                    content: Icon::Close.into(),
+                    position: position + Index::CLOSE_BUTTON_OFFSET,
+                    color: Color::from_rgb8(0xFF, 0x00, 0x00),
+                    size: Index::CLOSE_BUTTON_SIZE.width,
+                    font: ICON_FONT,
+                    horizontal_alignment: iced::alignment::Horizontal::Left,
+                    vertical_alignment: iced::alignment::Vertical::Top,
+                });
+            }
     
             // match macro_frame.action {
             //     crate::macro_parser::ActionType::Loop(frames, _) => {
@@ -566,14 +589,33 @@ impl MacroAction {
     //     actions
     // }
 
+    pub fn closeable(&self) -> bool {
+        match self.action {
+            ActionWrapper::Macro(_) => true,
+            ActionWrapper::Imaginary(_) => false,
+        }
+    }
+
     pub fn get_max_nested_depth(actions: &[MacroAction]) -> usize {
+        let mut first = None;
         let mut max_depth = 0;
 
         for action in actions {
             match action.index.as_ref() {
-                Index::ImaginaryIndex { .. } => {},
-                Index::Index { .. } => {},
+                Index::ImaginaryIndex { .. } => {
+                    if first.is_none() {
+                        first = Some(0);
+                    }
+                },
+                Index::Index { .. } => {
+                    if first.is_none() {
+                        first = Some(0);
+                    }
+                },
                 Index::Nested { parents, .. } => {
+                    if first.is_none() {
+                        first = Some(parents.len());
+                    }
                     if parents.len() > max_depth {
                         max_depth = parents.len();
                     }
@@ -581,10 +623,10 @@ impl MacroAction {
             }
         }
 
-        max_depth
+        max_depth - first.unwrap()
     }
 
-    pub fn get_loop(actions: &[MacroAction], index: Box<Index>) -> Vec<MacroAction> {
+    pub fn get_loop(actions: &[MacroAction], index: &Index) -> Vec<MacroAction> {
         let mut loop_actions = Vec::new();
 
         for action in actions {

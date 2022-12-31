@@ -121,7 +121,7 @@ impl Application for Configurator {
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
-                // index.remove_from_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                index.remove_from_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame)) => {
@@ -229,20 +229,21 @@ impl Application for Configurator {
             Message::LoadMacro(macro_type) => {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     let macros = con.get_macropad().lock().unwrap().macros[*i as usize].clone();
-                    self.key_tab.editor_actions = macro_editor::MacroAction::from_macro(match macro_type {
+                    self.key_tab.active_macro = match macro_type {
                         macro_parser::MacroType::Tap => {
-                            &macros.tap
+                            macros.tap.clone()
                         },
                         macro_parser::MacroType::Hold => {
-                            &macros.hold
+                            macros.hold.clone()
                         },
                         macro_parser::MacroType::DoubleTap => {
-                            &macros.double_tap
+                            macros.double_tap.clone()
                         },
                         macro_parser::MacroType::TapHold => {
-                            &macros.tap_hold
+                            macros.tap_hold.clone()
                         },
-                    });
+                    };
+                    self.key_tab.editor_actions = macro_editor::MacroAction::from_macro(&self.key_tab.active_macro);
 
                     self.state = State::Connected(
                         con.clone(),
