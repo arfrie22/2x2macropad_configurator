@@ -136,6 +136,10 @@ impl Application for Configurator {
             Message::EditorMessage(macro_editor::Message::DragStart) => {
                 self.key_tab.editor.request_redraw();
             }
+            Message::EditorMessage(macro_editor::Message::Scroll(offset)) => {
+                self.key_tab.editor.scroll_to(offset);
+                self.key_tab.editor.request_redraw();
+            }
             Message::HidMessage(_) => {}
             Message::HidEvent(hid_manager::Event::Connected(connection)) => {
                 self.key_tab = KeyTab::new(connection.get_macropad());
@@ -224,9 +228,25 @@ impl Application for Configurator {
             }
             Message::LoadMacro(macro_type) => {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                    let macros = con.get_macropad().lock().unwrap().macros[*i as usize].clone();
+                    self.key_tab.editor_actions = macro_editor::MacroAction::from_macro(match macro_type {
+                        macro_parser::MacroType::Tap => {
+                            &macros.tap
+                        },
+                        macro_parser::MacroType::Hold => {
+                            &macros.hold
+                        },
+                        macro_parser::MacroType::DoubleTap => {
+                            &macros.double_tap
+                        },
+                        macro_parser::MacroType::TapHold => {
+                            &macros.tap_hold
+                        },
+                    });
+
                     self.state = State::Connected(
                         con.clone(),
-                        Page::EditMacro(*i, macro_type),
+                        Page::EditMacro(*i, macro_type.clone()),
                     );
                 }
             }
@@ -701,7 +721,7 @@ impl KeyTab {
             macros: macropad.macros.clone(),
             active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
-            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(0, 0)), macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(1, 0))],
+            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(0, 0)), macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(1, 0))],
             actions: HashMap::new(),
         }
     }
@@ -784,7 +804,7 @@ impl Default for KeyTab {
             active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
             // TODO: REMOVE THIS DEFAULT
-            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(0, 0))],
+            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(0, 0))],
             actions: HashMap::new(),
         }
     }

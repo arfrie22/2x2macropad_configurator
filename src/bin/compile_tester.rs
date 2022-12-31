@@ -109,17 +109,42 @@ fn main() {
             macropad_wrapper::set_led_effect(&d, LedEffect::Rainbow).unwrap();
             macropad_wrapper::set_led_effect_period(&d, 5.0).unwrap();
 
-            // println!("Macro data: {:?}", parse_macro(&macro_data));
-            // println!("In\n{:?}", macro_data);
             macropad_wrapper::clear_macro(&d, 4).unwrap();
+            macropad_wrapper::set_macro(&d, 4, &macro_data).unwrap();
+            macropad_wrapper::validate_macro(&d, 4, &macro_data).unwrap();
+            
             macro_data[1] = 0x00;
             let macro_2 = parse_macro(&macro_data);
             println!("Macro 2: {:?}", macro_2);
             let macro_data_2 = macro_2.pack().unwrap();
-            macropad_wrapper::set_macro(&d, 4, &macro_data_2).unwrap();
-            // println!("Out\n{:?}", macropad_wrapper::get_macro(&d, 4).unwrap());
-            
-            macropad_wrapper::validate_macro(&d, 4, &macro_data_2).unwrap();
+            macropad_wrapper::clear_macro(&d, 5).unwrap();
+            macropad_wrapper::set_macro(&d, 5, &macro_data_2).unwrap();
+            macropad_wrapper::validate_macro(&d, 5, &macro_data_2).unwrap();
+
+            let mut mac3 = Macro::new();
+            mac3.add_frame(MacroFrame {
+                action: ActionType::Loop(vec![
+                    MacroFrame {
+                        action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
+                        delay: Some(Duration::from_millis(200)),
+                    },
+                    MacroFrame {
+                        action: ActionType::String(
+                            "This is a test, lmao".to_string(),
+                            Some(Duration::from_millis(100)),
+                        ),
+                        delay: None,
+                    },
+                ], 3),
+                delay: Some(Duration::from_millis(200)),
+            });
+
+            let macro_data_3 = mac3.pack().unwrap();
+
+            macropad_wrapper::clear_macro(&d, 6).unwrap();
+            macropad_wrapper::set_macro(&d, 6, &macro_data_3).unwrap();
+            macropad_wrapper::validate_macro(&d, 6, &macro_data_3).unwrap();
+
 
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
         }
