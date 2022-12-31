@@ -721,7 +721,7 @@ impl KeyTab {
             macros: macropad.macros.clone(),
             active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
-            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(0, 0)), macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(1, 0))],
+            editor_actions: Vec::new(),
             actions: HashMap::new(),
         }
     }
@@ -803,8 +803,7 @@ impl Default for KeyTab {
             macros: Vec::new(),
             active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
-            // TODO: REMOVE THIS DEFAULT
-            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Some(Duration::ZERO), macro_editor::Index::new_index(0, 0))],
+            editor_actions: Vec::new(),
             actions: HashMap::new(),
         }
     }
