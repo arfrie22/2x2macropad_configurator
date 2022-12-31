@@ -13,53 +13,21 @@ use iced::{Alignment, Application, Command, Element, Length, Settings, Subscript
 use iced_aw::style::TabBarStyles;
 use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs};
 use iced_native::widget::space;
+use macropad_configurator::font::{ROBOTO, ICON_FONT, Icon};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_parser::LedConfig;
+use macropad_configurator::macro_parser::{LedConfig, ActionType, MacroFrame};
 use macropad_configurator::type_wrapper::{KeyboardWrapper, ConsumerWrapper};
-use macropad_configurator::{hid_manager, macro_parser, macropad, macropad_wrapper, type_wrapper};
+use macropad_configurator::{hid_manager, macro_parser, macropad, macropad_wrapper, type_wrapper, macro_editor};
 use macropad_protocol::data_protocol::LedEffect;
 use macropad_protocol::macro_protocol;
 use num_enum::{FromPrimitive, IntoPrimitive};
 use usbd_human_interface_device::page::{Keyboard, Consumer};
 
-const ROBOTO: Font = iced::Font::External {
-    name: "Roboto",
-    bytes: include_bytes!("../assets/fonts/Roboto-Regular.ttf"),
-};
 
-const ROBOTO_BOLD: Font = iced::Font::External {
-    name: "Roboto Bold",
-    bytes: include_bytes!("../assets/fonts/Roboto-Bold.ttf"),
-};
-
-const ICON_FONT: Font = iced::Font::External {
-    name: "Remix Icon", // Can not be icons otherwise it conflicts with the default icon font
-    bytes: include_bytes!("../assets/fonts/remixicon.ttf"),
-};
 
 const ACTION_DELAY: u64 = 200;
 
-#[derive(Debug, Clone)]
-enum Icon {
-    Keyboard,
-    Light,
-    Gear,
-    Sun,
-    Moon,
-}
-
-impl From<Icon> for char {
-    fn from(icon: Icon) -> Self {
-        match icon {
-            Icon::Keyboard => '\u{ee72}',
-            Icon::Light => '\u{eea6}',
-            Icon::Gear => '\u{f0e5}',
-            Icon::Sun => '\u{f1bc}',
-            Icon::Moon => '\u{ef72}',
-        }
-    }
-}
 
 const HEADER_SIZE: u16 = 32;
 const TAB_PADDING: u16 = 16;
@@ -88,6 +56,7 @@ struct Configurator {
 pub enum Message {
     HidMessage(hid_manager::Message),
     HidEvent(hid_manager::Event),
+    EditorMessage(macro_editor::Message),
     CommandSent(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandReceived(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandErrored,
@@ -147,6 +116,26 @@ impl Application for Configurator {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
+            Message::EditorMessage(macro_editor::Message::MoveFrame(old_index, new_index)) => {
+                // index.move_in_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
+                // index.remove_from_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::AddFrame(frame)) => {
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::SelectFrame(index)) => {
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::ReleaseGrab) => {
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::DragStart) => {
+                self.key_tab.editor.request_redraw();
+            }
             Message::HidMessage(_) => {}
             Message::HidEvent(hid_manager::Event::Connected(connection)) => {
                 self.key_tab = KeyTab::new(connection.get_macropad());
@@ -614,8 +603,10 @@ impl Application for Configurator {
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
-                // pane_grid()
-                let message = text(format!("Edit {:?} Macro {:?}", macro_type, i)).font(ROBOTO).size(60);
+                let message = column![
+                    text(format!("Edit {:?} Macro {:?}", macro_type, i)).font(ROBOTO).size(60),
+                    self.key_tab.editor.view(&self.key_tab.editor_actions.as_slice()).map(Message::EditorMessage),
+                ];
 
                 container(message)
                     .width(Length::Fill)
@@ -690,6 +681,9 @@ struct KeyTab {
     show_picker: bool,
     key_configs: Vec<macro_parser::KeyConfig>,
     macros: Vec<macro_parser::MacroCollection>,
+    active_macro: macro_parser::Macro,
+    editor: macro_editor::State,
+    editor_actions: Vec<macro_editor::MacroAction>,
     actions: HashMap<
         macropad_protocol::data_protocol::KeyConfigElements,
         (bool, Instant, hid_manager::MacropadCommand),
@@ -705,6 +699,9 @@ impl KeyTab {
             show_picker: false,
             key_configs: macropad.key_configs.clone(),
             macros: macropad.macros.clone(),
+            active_macro: macro_parser::Macro::default(),
+            editor: macro_editor::State::default(),
+            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(0, 0)), macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(1, 0))],
             actions: HashMap::new(),
         }
     }
@@ -784,6 +781,10 @@ impl Default for KeyTab {
             show_picker: false,
             key_configs: Vec::new(),
             macros: Vec::new(),
+            active_macro: macro_parser::Macro::default(),
+            editor: macro_editor::State::default(),
+            // TODO: REMOVE THIS DEFAULT
+            editor_actions: vec![macro_editor::MacroAction::new(ActionType::Empty, Duration::ZERO, macro_editor::Index::new_index(0, 0))],
             actions: HashMap::new(),
         }
     }
@@ -1172,16 +1173,6 @@ impl Tab for SettingsTab {
             .on_press(Message::SwitchTheme)
             .style(Button::Text)
             ).width(Length::Fill).align_x(alignment::Horizontal::Right).align_y(alignment::Vertical::Top),
-            // container(column![
-            //     text("Theme").font(ROBOTO).size(30),
-                
-            // ])
-            // .padding(Padding {
-            //     top: 20,
-            //     right: 0,
-            //     bottom: 20,
-            //     left: 0,
-            // }),
             container(column![
                 container(column![
                     text("Press Time (ms)").font(ROBOTO).size(30),
@@ -1244,157 +1235,3 @@ impl Tab for SettingsTab {
     }
 }
 
-// // Ability to annoate sections for compounds (type string or press chord)
-// // 0x?? 0xID (start) 0x...... 0x?? 0xID (end)
-
-// struct Pane {
-//     id: usize,
-//     sibbling_id: Option<usize>,
-//     action_type: ActionType,
-//     delay: u32,
-// }
-
-// impl Pane {
-//     fn new(id: usize) -> Self {
-//         Self {
-//             id,
-//             // is_pinned: false,
-//         }
-//     }
-// }
-
-// fn view_content<'a>(
-//     pane: pane_grid::Pane,
-//     total_panes: usize,
-//     is_pinned: bool,
-//     size: Size,
-// ) -> Element<'a, Message> {
-//     let button = |label, message| {
-//         button(
-//             text(label)
-//                 .width(Length::Fill)
-//                 .horizontal_alignment(alignment::Horizontal::Center)
-//                 .size(16),
-//         )
-//         .width(Length::Fill)
-//         .padding(8)
-//         .on_press(message)
-//     };
-
-//     let mut controls = column![
-//         button(
-//             "Split horizontally",
-//             Message::Split(pane_grid::Axis::Horizontal, pane),
-//         ),
-//         button(
-//             "Split vertically",
-//             Message::Split(pane_grid::Axis::Vertical, pane),
-//         )
-//     ]
-//     .spacing(5)
-//     .max_width(150);
-
-//     if total_panes > 1 && !is_pinned {
-//         controls = controls.push(
-//             button("Close", Message::Close(pane))
-//                 .style(theme::Button::Destructive),
-//         );
-//     }
-
-//     let content = column![
-//         text(format!("{}x{}", size.width, size.height)).size(24),
-//         controls,
-//     ]
-//     .width(Length::Fill)
-//     .spacing(10)
-//     .align_items(Alignment::Center);
-
-//     container(scrollable(content))
-//         .width(Length::Fill)
-//         .height(Length::Fill)
-//         .padding(5)
-//         .center_y()
-//         .into()
-// }
-
-// fn view_controls<'a>(
-//     pane: pane_grid::Pane,
-//     total_panes: usize,
-//     is_pinned: bool,
-//     is_maximized: bool,
-// ) -> Element<'a, Message> {
-//     let mut row = row![].spacing(5);
-
-//     if total_panes > 1 {
-//         let toggle = {
-//             let (content, message) = if is_maximized {
-//                 ("Restore", Message::Restore)
-//             } else {
-//                 ("Maximize", Message::Maximize(pane))
-//             };
-//             button(text(content).size(14))
-//                 .style(theme::Button::Secondary)
-//                 .padding(3)
-//                 .on_press(message)
-//         };
-
-//         row = row.push(toggle);
-//     }
-
-//     let mut close = button(text("Close").size(14))
-//         .style(theme::Button::Destructive)
-//         .padding(3);
-
-//     if total_panes > 1 && !is_pinned {
-//         close = close.on_press(Message::Close(pane));
-//     }
-
-//     row.push(close).into()
-// }
-
-// mod style {
-//     use iced::widget::container;
-//     use iced::Theme;
-
-//     pub fn title_bar_active(theme: &Theme) -> container::Appearance {
-//         let palette = theme.extended_palette();
-
-//         container::Appearance {
-//             text_color: Some(palette.background.strong.text),
-//             background: Some(palette.background.strong.color.into()),
-//             ..Default::default()
-//         }
-//     }
-
-//     pub fn title_bar_focused(theme: &Theme) -> container::Appearance {
-//         let palette = theme.extended_palette();
-
-//         container::Appearance {
-//             text_color: Some(palette.primary.strong.text),
-//             background: Some(palette.primary.strong.color.into()),
-//             ..Default::default()
-//         }
-//     }
-
-//     pub fn pane_active(theme: &Theme) -> container::Appearance {
-//         let palette = theme.extended_palette();
-
-//         container::Appearance {
-//             background: Some(palette.background.weak.color.into()),
-//             border_width: 2.0,
-//             border_color: palette.background.strong.color,
-//             ..Default::default()
-//         }
-//     }
-
-//     pub fn pane_focused(theme: &Theme) -> container::Appearance {
-//         let palette = theme.extended_palette();
-
-//         container::Appearance {
-//             background: Some(palette.background.weak.color.into()),
-//             border_width: 2.0,
-//             border_color: palette.primary.strong.color,
-//             ..Default::default()
-//         }
-//     }
-// }

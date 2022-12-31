@@ -4,3 +4,5 @@ pub mod macropad_wrapper;
 pub mod macropad;
 pub mod led_effects;
 pub mod type_wrapper;
+pub mod macro_editor;
+pub mod font;
