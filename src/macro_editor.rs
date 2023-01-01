@@ -75,31 +75,56 @@ impl Index {
     //     close_button_bounds.contains(Point::ORIGIN + offset)
     // }
 
-    pub fn add_to_macro(&self, frame: MacroFrame, actions: &mut Vec<Action>) {
-        if self.parents.is_empty() {
-            let mut parents = self.parents.clone();
-            match actions[parents.remove(0)].get_action().borrow_mut() {
-                ActionWrapper::Loop(actions, _) => {
-                    let index = Index { index: self.index, parents };
-                    index.add_to_macro(frame, actions)
-                }
-                _ => unreachable!(),
+    fn add_to_macro_recurse(index: Index, frame: MacroFrame, root: Action) {
+        if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
+            if !index.parents.is_empty() {
+                let mut parents = index.parents.clone();
+                let mut parent_index = parents.remove(0);
+                let index = Index { index: index.index, parents };
+                Index::add_to_macro_recurse(index, frame, actions[parent_index].clone());
+            } else {
+                let mut actions = actions.clone();
+                actions.insert(index.index, Action::from(frame));
+                root.set_action(ActionWrapper::Loop(actions, count));
             }
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn add_to_macro(&self, frame: MacroFrame, actions: &mut Vec<Action>) {
+        if !self.parents.is_empty() {
+            let mut parents = self.parents.clone();
+            let parent_index = parents.remove(0);
+            Index::add_to_macro_recurse(Index {index: self.index, parents}, frame, actions[parent_index].clone());
         } else {
             actions.insert(self.index, Action::from(frame));
         }
     }
 
-    pub fn remove_from_macro(&self, actions: &mut Vec<Action>) -> MacroFrame {
-        if self.parents.is_empty() {
-            let mut parents = self.parents.clone();
-            match actions[parents.remove(0)].get_action().borrow_mut() {
-                ActionWrapper::Loop(actions, _) => {
-                    let index = Index { index: self.index, parents };
-                    index.remove_from_macro(actions)
-                }
-                _ => unreachable!(),
+    fn remove_from_macro_recurse(index: Index, root: Action) -> MacroFrame {
+        if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
+            if !index.parents.is_empty() {
+                let mut parents = index.parents.clone();
+                let mut parent_index = parents.remove(0);
+                let index = Index { index: index.index, parents };
+                Index::remove_from_macro_recurse(index, actions[parent_index].clone())
+            } else {
+                let mut actions = actions.clone();
+                let frame = actions.remove(index.index);
+                root.set_action(ActionWrapper::Loop(actions, count));
+                frame.into()
             }
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn remove_from_macro(&self, actions: &mut Vec<Action>) -> MacroFrame {
+        if !self.parents.is_empty() {
+            let mut parents = self.parents.clone();
+            let parent_index = parents.remove(0);
+            Index::remove_from_macro_recurse(Index {index: self.index, parents}, actions[parent_index].clone())
         } else {
             actions.remove(self.index).into()
         }
@@ -287,26 +312,11 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                             return (event::Status::Captured, message);   
                                         }
                                     } else {
-                                        // for action in self.actions {
-                                        //     let index = action.try_lock().unwrap().index.try_lock().unwrap().clone();
-                                        //     let action_index = index.get_root_action_index();
-
-                                        //     // TODO: Check if current selected index is in the list actions
-                                        //     for action in actions.iter() {
-                                        //         if action.try_lock().unwrap().index.try_lock().unwrap().clone().get_root_action_index() == action_index {
-                                        //             continue;
-                                        //         }
-                                        //     }
-
-                                            
-
-                                        //     let top_left = index.get_top_left(self.state.scroll_offset) - Vector::new(-LOOP_PADDING, -ACTION_SIZE.height / 2.0);
-                                        //     let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + LOOP_PADDING * 2.0, ACTION_SIZE.height));
-                                        //     if bounds.contains(cursor_position) {
-                                        //         message = Some(Message::MoveFrame(original_index, index));
-                                        //         break;
-                                        //     }
-                                        // }
+                                        if let Some((hover_action, offset)) = Action::get_offset(self.actions, self.state.scroll_offset, cursor_position) {
+                                            if action != hover_action {
+                                                message = Some(Message::MoveFrame(action.index_from(self.actions).unwrap(), hover_action.index_from(self.actions).unwrap()));
+                                            }
+                                        }
                                     }
 
                                     *state = (Some(Drag { action, drag_offset, moved, to: cursor_position }), None); 

@@ -122,13 +122,13 @@ impl Application for Configurator {
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
-                // index.remove_from_macro(&mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                index.remove_from_macro(&mut self.key_tab.editor_actions);
 
-                let frame = MacroFrame {
-                    action: ActionType::Empty,
-                    delay: Some(Duration::ZERO),
-                };
-                index.add_to_macro(frame, &mut self.key_tab.editor_actions);
+                // let frame = MacroFrame {
+                //     action: ActionType::Empty,
+                //     delay: Some(Duration::ZERO),
+                // };
+                // index.add_to_macro(frame, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
