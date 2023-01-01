@@ -16,6 +16,7 @@ use iced_native::widget::space;
 use macropad_configurator::font::{ROBOTO, ICON_FONT, Icon};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
+use macropad_configurator::macro_editor::Action;
 use macropad_configurator::macro_parser::{LedConfig, ActionType, MacroFrame};
 use macropad_configurator::type_wrapper::{KeyboardWrapper, ConsumerWrapper};
 use macropad_configurator::{hid_manager, macro_parser, macropad, macropad_wrapper, type_wrapper, macro_editor};
@@ -117,7 +118,7 @@ impl Application for Configurator {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::EditorMessage(macro_editor::Message::MoveFrame(old_index, new_index)) => {
-                old_index.move_in_macro(new_index, &mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                old_index.move_in_macro(new_index, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
@@ -127,11 +128,11 @@ impl Application for Configurator {
                     action: ActionType::Empty,
                     delay: Some(Duration::ZERO),
                 };
-                index.add_to_macro(frame, &mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                index.add_to_macro(frame, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
-                index.add_to_macro(frame, &mut self.key_tab.active_macro, &mut self.key_tab.editor_actions);
+                index.add_to_macro(frame, &mut self.key_tab.editor_actions);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::SelectFrame(index)) => {
@@ -250,7 +251,8 @@ impl Application for Configurator {
                             macros.tap_hold.clone()
                         },
                     };
-                    self.key_tab.editor_actions = macro_editor::MacroAction::from_macro(&self.key_tab.active_macro);
+                    self.key_tab.editor_actions = macro_editor::Action::from_macro(&self.key_tab.active_macro);
+                    self.key_tab.editor.reset_scroll();
                     self.key_tab.editor.request_redraw();
 
                     self.state = State::Connected(
@@ -714,7 +716,7 @@ struct KeyTab {
     macros: Vec<macro_parser::MacroCollection>,
     active_macro: macro_parser::Macro,
     editor: macro_editor::State,
-    editor_actions: Vec<Arc<Mutex<macro_editor::MacroAction>>>,
+    editor_actions: Vec<Action>,
     actions: HashMap<
         macropad_protocol::data_protocol::KeyConfigElements,
         (bool, Instant, hid_manager::MacropadCommand),

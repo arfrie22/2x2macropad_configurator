@@ -1,4 +1,7 @@
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::{RefCell, Ref, RefMut};
 use std::ops::Sub;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -12,230 +15,105 @@ use iced::{Element, Length, Point, Rectangle, Theme};
 use crate::font::{ROBOTO, Icon, ICON_FONT};
 use crate::macro_parser::{MacroFrame, Macro, self};
 
+
+const CLOSE_BUTTON_PADDING: f32 = 1.0;
+pub const CLOSE_BUTTON_OFFSET: Vector = Vector::new(ACTION_SIZE.width - ACTION_SIZE.height - CLOSE_BUTTON_PADDING, CLOSE_BUTTON_PADDING);
+pub const CLOSE_BUTTON_SIZE: Size = Size::new(ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING), ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING));
+
 #[derive(Debug, Clone)]
-pub enum Index {
-    ImaginaryIndex {
-        action_index: usize,
-        parent_index: Arc<Mutex<Index>>,
-    },
-    Index {
-        action_index: usize,
-        index: usize,
-    },
-    Nested {
-        action_index: usize,
-        index: usize,
-        parents: Vec<Arc<Mutex<Index>>>
-    },
+pub struct Index {
+    pub index: usize,
+    pub parents: Vec<usize>,
 }
 
 impl Index {
-    pub fn set_action_index(&mut self, action_index: usize) {
-        match self {
-            Index::ImaginaryIndex { action_index: index, .. } => *index = action_index,
-            Index::Index { action_index: index, .. } => *index = action_index,
-            Index::Nested { action_index: index, .. } => *index = action_index,
-        }
-    }
-
-    pub fn set_index(&mut self, index: usize) {
-        match self {
-            Index::ImaginaryIndex { parent_index, .. } => parent_index.try_lock().unwrap().set_index(index),
-            Index::Index { index: i, .. } => *i = index,
-            Index::Nested { index: i, .. } => *i = index,
-        }
-    }
-    
     pub fn get_level(&self) -> usize {
-        match self {
-            Index::ImaginaryIndex { parent_index, .. } => parent_index.try_lock().unwrap().get_level(),
-            Index::Index { .. } => 0,
-            Index::Nested { parents, .. } => parents.len(),
-        }
+        self.parents.len()
     }
 
-    pub fn get_index(&self) -> usize {
-        match self {
-            Index::ImaginaryIndex { parent_index, .. } => parent_index.try_lock().unwrap().get_index(),
-            Index::Index { index, .. } => *index,
-            Index::Nested { index, .. } => *index,
-        }
-    }
+    // pub fn get_top_left(&self, scroll_offset: Vector) -> Point {
+    //     match self {
+    //         Index::ImaginaryIndex { action_index, parent_index } => {
+    //             let x = parent_index.try_lock().unwrap().get_level() as f32 * LOOP_PADDING;
+    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
 
-    pub fn get_root_action_index(&self) -> usize {
-        match self {
-            Index::ImaginaryIndex { parent_index, .. } => parent_index.try_lock().unwrap().get_root_action_index(),
-            Index::Index { action_index, .. } => *action_index,
-            Index::Nested { action_index, .. } => *action_index,
-        }
-    }
+    //             Point::new(0.0, y) - scroll_offset
+    //         },
+    //         Index::Index { action_index, .. } => {
+    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
 
-    pub fn get_top_left(&self, scroll_offset: Vector) -> Point {
-        match self {
-            Index::ImaginaryIndex { action_index, parent_index } => {
-                let x = parent_index.try_lock().unwrap().get_level() as f32 * LOOP_PADDING;
-                let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
+    //             Point::new(0.0, y) - scroll_offset
+    //         },
+    //         Index::Nested { action_index, .. } => {
+    //             let x = self.get_level() as f32 * LOOP_PADDING;
+    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
 
-                Point::new(0.0, y) - scroll_offset
-            },
-            Index::Index { action_index, .. } => {
-                let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
+    //             Point::new(x, y) - scroll_offset
+    //         },
+    //     }
+    // }
 
-                Point::new(0.0, y) - scroll_offset
-            },
-            Index::Nested { action_index, .. } => {
-                let x = self.get_level() as f32 * LOOP_PADDING;
-                let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
-
-                Point::new(x, y) - scroll_offset
-            },
-        }
-    }
-
-    pub fn get_offset(&self, scroll_offset: Vector, point: Point) -> Option<Vector> {
-        let top_left = self.get_top_left(scroll_offset);
-        let bounds = Rectangle::new(top_left, ACTION_SIZE);
+    // pub fn get_offset(&self, scroll_offset: Vector, point: Point) -> Option<Vector> {
+    //     let top_left = self.get_top_left(scroll_offset);
+    //     let bounds = Rectangle::new(top_left, ACTION_SIZE);
         
-        if bounds.contains(point) {
-            Some(point - top_left)
+    //     if bounds.contains(point) {
+    //         Some(point - top_left)
+    //     } else {
+    //         None
+    //     }
+    // }
+
+    
+
+    // pub fn on_close_button(offset: Vector) -> bool {
+    //     let close_button_bounds = Rectangle::new(
+    //         Point::ORIGIN + Self::CLOSE_BUTTON_OFFSET,
+    //         Self::CLOSE_BUTTON_SIZE
+    //     );
+
+    //     close_button_bounds.contains(Point::ORIGIN + offset)
+    // }
+
+    pub fn add_to_macro(&self, frame: MacroFrame, actions: &mut Vec<Action>) {
+        if self.parents.is_empty() {
+            let mut parents = self.parents.clone();
+            match actions[parents.remove(0)].get_action().borrow_mut() {
+                ActionWrapper::Loop(actions, _) => {
+                    let index = Index { index: self.index, parents };
+                    index.add_to_macro(frame, actions)
+                }
+                _ => unreachable!(),
+            }
         } else {
-            None
+            actions.insert(self.index, Action::from(frame));
         }
     }
 
-    const CLOSE_BUTTON_PADDING: f32 = 1.0;
-    pub const CLOSE_BUTTON_OFFSET: Vector = Vector::new(ACTION_SIZE.width - ACTION_SIZE.height - Self::CLOSE_BUTTON_PADDING, Self::CLOSE_BUTTON_PADDING);
-    pub const CLOSE_BUTTON_SIZE: Size = Size::new(ACTION_SIZE.height - (2.0 * Self::CLOSE_BUTTON_PADDING), ACTION_SIZE.height - (2.0 * Self::CLOSE_BUTTON_PADDING));
-
-    pub fn on_close_button(offset: Vector) -> bool {
-        let close_button_bounds = Rectangle::new(
-            Point::ORIGIN + Self::CLOSE_BUTTON_OFFSET,
-            Self::CLOSE_BUTTON_SIZE
-        );
-
-        close_button_bounds.contains(Point::ORIGIN + offset)
-    }
-
-    pub fn add_to_macro(&self, frame: MacroFrame, macro_: &mut Macro, actions: &mut Vec<Arc<Mutex<MacroAction>>>) {
-        match self {
-            Index::ImaginaryIndex { action_index, parent_index } => unreachable!(),
-            Index::Index { action_index, index } => {
-                macro_.frames.insert(*index, frame.clone());
-                
-                let new_actions = MacroAction::from_frames(&[frame.clone()], Vec::new());
-                for (i, action) in new_actions.iter().enumerate() {
-                    actions.insert(*action_index + i, action.clone());
+    pub fn remove_from_macro(&self, actions: &mut Vec<Action>) -> MacroFrame {
+        if self.parents.is_empty() {
+            let mut parents = self.parents.clone();
+            match actions[parents.remove(0)].get_action().borrow_mut() {
+                ActionWrapper::Loop(actions, _) => {
+                    let index = Index { index: self.index, parents };
+                    index.remove_from_macro(actions)
                 }
-
-                MacroAction::update_action_indexs(actions.iter_mut());
-            },
-            Index::Nested { action_index, index, parents } => {
-                let mut parents = parents.clone();
-                println!("parents: {:?}", parents);
-                println!("macro_: {:?}", macro_);
-                let mut pointer = macro_.frames.get_mut(parents.remove(0).try_lock().unwrap().get_index()).unwrap();
-                while !parents.is_empty() {
-                    pointer = match &mut pointer.action {
-                        macro_parser::ActionType::Loop(frames, _) => {
-                            frames.get_mut(parents.remove(0).try_lock().unwrap().get_index()).unwrap()
-                        },
-
-                        _ => unreachable!(),
-                    };
-                }
-
-                match &mut pointer.action {
-                    macro_parser::ActionType::Loop(frames, _) => {
-                        frames.insert(*index, frame.clone());
-                    },
-
-                    _ => unreachable!(),
-                }
-                
-                let new_actions = MacroAction::from_frames(&[frame.clone()], parents);
-                new_actions.first().unwrap().try_lock().unwrap().index.try_lock().unwrap().set_index(*action_index);
-                println!("new_actions: {:?}", new_actions);
-                for (i, action) in new_actions.iter().enumerate() {
-                    println!("action: {:?}", action);
-                    actions.insert(*action_index + i, action.clone());
-                }
-
-                MacroAction::update_action_indexs(actions.iter_mut());
-            },
+                _ => unreachable!(),
+            }
+        } else {
+            actions.remove(self.index).into()
         }
-
-        MacroAction::update_action_indexs(actions.iter_mut());
     }
 
-    pub fn remove_from_macro(&self, macro_: &mut Macro, actions: &mut Vec<Arc<Mutex<MacroAction>>>) -> MacroFrame {
-        let frame = match self {
-            Index::ImaginaryIndex { action_index, parent_index } => unreachable!(),
-            Index::Index { action_index, index } => {
-                let frame = macro_.frames.remove(*index);
-                
-                if let macro_parser::ActionType::Loop(_, _) = frame.action {
-                    let loop_actions = MacroAction::get_loop(actions.as_slice(), self);
-                    for _ in loop_actions {
-                        actions.remove(*action_index);
-                    }
-                } else {
-                    actions.remove(*action_index);
-                }
-
-                frame
-            },
-            Index::Nested { action_index, index, parents } => {
-                println!("action_index: {}, index: {}, parents: {:?}", action_index, index, parents);
-                println!("macro_: {:?}", macro_);
-                let mut parents = parents.clone();
-                let mut pointer = macro_.frames.get_mut(parents.remove(0).try_lock().unwrap().get_index()).unwrap();
-                println!("pointer: {:?}", pointer);
-                while !parents.is_empty() {
-                    pointer = match &mut pointer.action {
-                        macro_parser::ActionType::Loop(frames, _) => {
-                            frames.get_mut(parents.remove(0).try_lock().unwrap().get_index()).unwrap()
-                        },
-
-                        _ => unreachable!(),
-                    };
-
-                    println!("pointer: {:?}", pointer);
-                }
-
-                println!("pointer: {:?}", pointer);
-                let frame = match &mut pointer.action {
-                    macro_parser::ActionType::Loop(frames, _) => {
-                        frames.remove(*index)
-                    },
-
-                    _ => unreachable!("action: {:?}", pointer.action),
-                };
-
-                if let macro_parser::ActionType::Loop(_, _) = frame.action {
-                    let loop_actions = MacroAction::get_loop(actions.as_slice(), self);
-                    for _ in loop_actions {
-                        actions.remove(*action_index);
-                    }
-                } else {
-                    actions.remove(*action_index);
-                }
-
-                frame
-            },
-        };
-
-        MacroAction::update_action_indexs(actions.iter_mut());
-
-        frame
+    pub fn move_in_macro(&self, new_index: Index, actions: &mut Vec<Action>) {
+        let frame = self.remove_from_macro(actions);
+        new_index.add_to_macro(frame, actions);
     }
+}
 
-    pub fn move_in_macro(&self, new_index: Index, macro_: &mut Macro, actions: &mut Vec<Arc<Mutex<MacroAction>>>) {
-        let frame = self.remove_from_macro(macro_, actions);
-        new_index.add_to_macro(frame, macro_, actions);
-    }
-
-    pub fn new_index(action_index: usize, index: usize) -> Self {
-        Index::Index { action_index, index }
+impl PartialEq for Index {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.parents == other.parents
     }
 }
 
@@ -263,7 +141,7 @@ const LOOP_PADDING: f32 = 50.0;
 
 
 impl State {
-    pub fn view<'a>(&'a self, actions: &'a [Arc<Mutex<MacroAction>>]) -> Element<'a, Message> {
+    pub fn view<'a>(&'a self, actions: &'a [Action]) -> Element<'a, Message> {
         Canvas::new(Editor {
             state: self,
             actions,
@@ -281,11 +159,11 @@ impl State {
         self.scroll_offset = offset;
     }
 
-    pub fn scroll_to_top(&mut self, actions: &[Arc<Mutex<MacroAction>>]) {
+    pub fn reset_scroll(&mut self) {
         self.scroll_offset = Vector::new(0.0, 0.0);
     }
 
-    pub fn scroll_to_bottom(&mut self, actions: &[Arc<Mutex<MacroAction>>], bounds: &Rectangle) {
+    pub fn scroll_to_bottom(&mut self, actions: &[Action], bounds: &Rectangle) {
         let max_y = (actions.len() as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - ACTION_PADDING;
         self.scroll_offset = Vector::new(0.0, max_y.sub(bounds.height).max(0.0));
     }
@@ -293,9 +171,9 @@ impl State {
 
 #[derive(Debug, Clone)]
 struct Drag {
-    actions: Vec<Arc<Mutex<MacroAction>>>,
+    action: Action,
     drag_offset: Vector,
-    start_position: Point,
+    moved: bool,
     to: Point,
 }
 
@@ -304,20 +182,13 @@ impl Drag {
         let mut frame = Frame::new(bounds.size());
 
         if let Some(cursor_position) = cursor.position_in(&bounds) {
-            for (index, action) in self.actions.iter().enumerate() {
-                let action_index = action.try_lock().unwrap().index.try_lock().unwrap().clone();
-                let x = LOOP_PADDING * match &action_index {
-                    Index::ImaginaryIndex { parent_index, .. } => parent_index.try_lock().unwrap().get_level() as f32,
-                    Index::Index { .. } => 0.0,
-                    Index::Nested { .. } => action_index.get_level() as f32,
-                };
-                action.try_lock().unwrap().draw(
-                    &mut frame,
-                    theme,
-                    (cursor_position - self.drag_offset) + Vector::new(x, ((ACTION_SIZE.height + ACTION_PADDING) * index as f32) - 1.0),
-                    &None,
-                );
-            }
+            self.action.draw(
+                &mut frame,
+                theme,
+                cursor_position - self.drag_offset,
+                &None,
+                &None,
+            );
         }
 
         frame.into_geometry()
@@ -326,24 +197,24 @@ impl Drag {
 
 struct Editor<'a> {
     state: &'a State,
-    actions: &'a [Arc<Mutex<MacroAction>>],
+    actions: &'a [Action],
 }
 
 impl<'a> Editor<'a> {
     fn get_max_x_offset(&self, bounds: &Rectangle) -> f32 {
-        let max_x = ACTION_SIZE.width + (LOOP_PADDING * MacroAction::get_max_nested_depth(self.actions) as f32);
+        let max_x = ACTION_SIZE.width + (LOOP_PADDING * (Action::max_width(self.actions) - 1) as f32);
 
         max_x.sub(bounds.width).max(0.0)
     }
 
     fn get_max_y_offset(&self, bounds: &Rectangle) -> f32 {
-        let max_y = (self.actions.len() as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - ACTION_PADDING;
+        let max_y = (Action::max_length(self.actions) as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - ACTION_PADDING;
         max_y.sub(bounds.height).max(0.0)
     }
 }
 
 impl<'a> canvas::Program<Message> for Editor<'a> {
-    type State = (Option<Drag>, Option<Index>);
+    type State = (Option<Drag>, Option<Action>);
 
     fn update(
         &self,
@@ -363,72 +234,40 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             Event::Mouse(mouse_event) => {
                 let message = match mouse_event {
                     mouse::Event::WheelScrolled { delta } => {
-                        match delta {
+                        let scroll_offset = match delta {
                             mouse::ScrollDelta::Lines { x, y } => {
-                                let scroll_offset = self.state.scroll_offset + Vector::new(x * 20.0, -y * 20.0);
-                                Some(Message::Scroll(scroll_offset))
+                                self.state.scroll_offset + Vector::new(x * 20.0, -y * 20.0)
                             },
                             mouse::ScrollDelta::Pixels { x, y } => {
-                                let scroll_offset = self.state.scroll_offset + Vector::new(x, -y);
-                                let scroll_offset = Vector::new(scroll_offset.x.max(0.0).min(self.get_max_x_offset(&bounds)), scroll_offset.y.max(0.0).min(self.get_max_y_offset(&bounds)));
-                                Some(Message::Scroll(scroll_offset))
+                                self.state.scroll_offset + Vector::new(x, -y)
+                                
                             },
-                        }
+                        };
+
+                        let scroll_offset = Vector::new(scroll_offset.x.max(0.0).min(self.get_max_x_offset(&bounds)), scroll_offset.y.max(0.0).min(self.get_max_y_offset(&bounds)));
+                        Some(Message::Scroll(scroll_offset))
                     },
                     mouse::Event::ButtonPressed(mouse::Button::Left) => {
                         match *state {
                             (None, _) => {
-                                for action in self.actions {
-                                    let action_u = action.try_lock().unwrap().clone();
-                                    let index = action_u.index.try_lock().unwrap().clone();
-                                    if let Some(offset) = index.get_offset(self.state.scroll_offset, cursor_position) {
-                                        if action_u.closeable() && Index::on_close_button(offset) {
-                                            *state = (None, None);
-                                            println!("Close button pressed");
-                                            return (event::Status::Captured, Some(Message::RemoveFrame(index.clone())));
-                                        }
-
-                                        match &action_u.action {
-                                            ActionWrapper::Macro(action_type) => {
-                                                match action_type {
-                                                    macro_parser::ActionType::Loop(_, _) => {
-                                                        *state = (Some(Drag {
-                                                            actions: MacroAction::get_loop(self.actions, &index),
-                                                            drag_offset: offset,
-                                                            start_position: cursor_position,
-                                                            to: cursor_position,
-                                                        }), None);
-                                                    },
-
-                                                    _ => {
-                                                        *state = (Some(Drag {
-                                                            actions: vec![action.clone()],
-                                                            drag_offset: offset,
-                                                            start_position: cursor_position,
-                                                            to: cursor_position,
-                                                        }), None);
-                                                    }
-                                                }
-                                            },
-                                            ActionWrapper::Imaginary(ImaginaryAction::LoopEnd) => {
-                                                let actions = MacroAction::get_loop(self.actions, &index);
-                                                let drag_offset = offset + Vector::new(0.0, (ACTION_SIZE.height + ACTION_PADDING) * (actions.len() - 1) as f32);
-                                                *state = (Some(Drag {
-                                                    actions,
-                                                    drag_offset,
-                                                    start_position: cursor_position,
-                                                    to: cursor_position,
-                                                }), None);
-                                            },
-                                            _ => unimplemented!()
-                                        }
-
-                                        return (event::Status::Captured, None);
+                                if let Some((action, offset)) = Action::get_offset(self.actions, self.state.scroll_offset, cursor_position) {
+                                    if action.on_close_button(offset) {
+                                        *state = (None, None);
+                                        println!("Close button pressed");
+                                        return (event::Status::Captured, Some(Message::RemoveFrame(action.index_from(self.actions).unwrap())));
                                     }
+
+                                    *state = (Some(Drag {
+                                        action,
+                                        drag_offset: offset,
+                                        moved: false,
+                                        to: cursor_position,
+                                    }), None);
+
+                                    return (event::Status::Captured, None);
                                 }
 
-                                if state.1.is_some() {
-                                    *state = (None, None);
+                                if state.1.take().is_some() {
                                     return (event::Status::Captured, Some(Message::SelectFrame(None)));
                                 }
                                 None
@@ -439,36 +278,38 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                     mouse::Event::CursorMoved { .. } => {
                         if let Some(cursor_position) = cursor.position_in(&bounds) {
                             match state.0.take() {
-                                Some(Drag { actions, drag_offset, start_position, to, .. }) => {
+                                Some(Drag { action, drag_offset, moved, to, .. }) => {
                                     let mut message = None;
-                                    let original_index = actions.first().unwrap().try_lock().unwrap().index.try_lock().unwrap().clone();
-                                    if start_position == to && cursor_position != to {
-                                        message = Some(Message::DragStart);
+                                    if !moved {
+                                        if cursor_position != to {
+                                            message = Some(Message::DragStart);
+                                            *state = (Some(Drag { action, drag_offset, moved: true, to: cursor_position }), None); 
+                                            return (event::Status::Captured, message);   
+                                        }
                                     } else {
-                                        for action in self.actions {
-                                            let index = action.try_lock().unwrap().index.try_lock().unwrap().clone();
-                                            let action_index = index.get_root_action_index();
+                                        // for action in self.actions {
+                                        //     let index = action.try_lock().unwrap().index.try_lock().unwrap().clone();
+                                        //     let action_index = index.get_root_action_index();
 
-                                            // TODO: Check if current selected index is in the list actions
-                                            for action in actions.iter() {
-                                                if action.try_lock().unwrap().index.try_lock().unwrap().clone().get_root_action_index() == action_index {
-                                                    continue;
-                                                }
-                                            }
+                                        //     // TODO: Check if current selected index is in the list actions
+                                        //     for action in actions.iter() {
+                                        //         if action.try_lock().unwrap().index.try_lock().unwrap().clone().get_root_action_index() == action_index {
+                                        //             continue;
+                                        //         }
+                                        //     }
 
                                             
 
-                                            let top_left = index.get_top_left(self.state.scroll_offset) - Vector::new(-LOOP_PADDING, -ACTION_SIZE.height / 2.0);
-                                            let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + LOOP_PADDING * 2.0, ACTION_SIZE.height));
-                                            if bounds.contains(cursor_position) {
-                                                message = Some(Message::MoveFrame(original_index, index));
-                                                break;
-                                            }
-                                        }
+                                        //     let top_left = index.get_top_left(self.state.scroll_offset) - Vector::new(-LOOP_PADDING, -ACTION_SIZE.height / 2.0);
+                                        //     let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + LOOP_PADDING * 2.0, ACTION_SIZE.height));
+                                        //     if bounds.contains(cursor_position) {
+                                        //         message = Some(Message::MoveFrame(original_index, index));
+                                        //         break;
+                                        //     }
+                                        // }
                                     }
-                                    
-                                    let to = cursor_position;
-                                    *state = (Some(Drag { actions, drag_offset, start_position, to }), None);
+
+                                    *state = (Some(Drag { action, drag_offset, moved, to: cursor_position }), None); 
                                     return (event::Status::Captured, message);
                                 }
                                 _ => None,
@@ -479,11 +320,11 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                     }
                     mouse::Event::ButtonReleased(mouse::Button::Left) => {
                         match state.0.take() {
-                            Some(Drag { actions, start_position, to, .. }) => {
-                                println!("Drag from {:?} to {:?}", start_position, to);
-                                if start_position == to {
-                                    *state = (None, Some(actions.first().unwrap().try_lock().unwrap().index.try_lock().unwrap().clone()));
-                                    return (event::Status::Captured, Some(Message::SelectFrame(Some((*actions.first().unwrap().try_lock().unwrap().index.try_lock().unwrap()).clone()))));
+                            Some(Drag { action, moved, to, .. }) => {
+                                if !moved {
+                                    let index = action.index_from(self.actions).unwrap();
+                                    *state = (None, Some(action));
+                                    return (event::Status::Captured, Some(Message::SelectFrame(Some(index))));
                                 }
                                 // for action in self.actions {
                                 //     if let Some(offset) = action.index.get_offset(self.state.scroll_offset, cursor_position) {
@@ -518,7 +359,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
     ) -> Vec<Geometry> {
         let content =
             self.state.cache.draw(bounds.size(), |frame: &mut Frame| {
-                MacroAction::draw_all(self.actions, frame, theme, self.state.scroll_offset, &state.1, &state.0);
+                Action::draw_all(self.actions, frame, theme, self.state.scroll_offset, &state.1, &state.0);
 
                 frame.stroke(
                     &Path::rectangle(Point::ORIGIN, frame.size()),
@@ -542,10 +383,21 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 let placeholder = {
                     let mut frame = Frame::new(bounds.size());
 
-                    let position = drag.actions.first().unwrap().try_lock().unwrap().index.try_lock().unwrap().get_top_left(self.state.scroll_offset);
+                    let index = drag.action.index_from(self.actions).unwrap();
+
+                    let position = Point::new(
+                        LOOP_PADDING * index.parents.len() as f32,
+                        {
+                            let mut y = index.index;
+                            for parent in index.parents {
+                                y += parent + 1;
+                            }
+                            y as f32 * (ACTION_SIZE.height + ACTION_PADDING)
+                        },
+                    ) - self.state.scroll_offset;
                     
                     frame.stroke(
-                        &Path::rectangle(position, Size::new(ACTION_SIZE.width + (LOOP_PADDING * MacroAction::get_max_nested_depth(self.actions) as f32) , ((ACTION_SIZE.height + ACTION_PADDING) * drag.actions.len() as f32) - ACTION_PADDING)),
+                        &Path::rectangle(position, Size::new(ACTION_SIZE.width + (LOOP_PADDING * (drag.action.calculate_width() - 1) as f32) , ((ACTION_SIZE.height + ACTION_PADDING) * drag.action.calculate_length() as f32) - ACTION_PADDING)),
                         Stroke::default().with_color(Color::from_rgb8(0x00, 0xFF, 0xFF)).with_width(3.0),
                     );
 
@@ -567,18 +419,15 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             Some(_) => mouse::Interaction::Grabbing,
             None => {
                 if let Some(cursor_position) = cursor.position_in(&bounds) {
-                    for action in self.actions {
-                        let action = action.try_lock().unwrap().clone();
-                        if let Some(offset) = action.index.try_lock().unwrap().get_offset(self.state.scroll_offset, cursor_position) {
-                            if action.closeable() && Index::on_close_button(offset) {
-                                return mouse::Interaction::Pointer;
-                            } else {
-                                return mouse::Interaction::Grab;
-                            }
-                        };
-                    };
-        
-                    mouse::Interaction::default()
+                    if let Some((action, offset)) = Action::get_offset(self.actions, self.state.scroll_offset, cursor_position) {
+                        if action.on_close_button(offset) {
+                            mouse::Interaction::Pointer
+                        } else {
+                            mouse::Interaction::Grab
+                        }
+                    } else {
+                        mouse::Interaction::default()
+                    }
                 } else {
                     mouse::Interaction::default()
                 }
@@ -588,230 +437,385 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum ImaginaryAction {
-    LoopEnd
+pub enum ActionWrapper {
+    Empty,
+    SetLed((u8, u8, u8)),
+    ClearLed,
+    KeyDown(usbd_human_interface_device::page::Keyboard),
+    KeyUp(usbd_human_interface_device::page::Keyboard),
+    KeyPress(usbd_human_interface_device::page::Keyboard, Option<Duration>),
+    ConsumerPress(usbd_human_interface_device::page::Consumer, Option<Duration>),
+    String(String, Option<Duration>),
+    Chord(Vec<usbd_human_interface_device::page::Keyboard>, Option<Duration>),
+    Loop(Vec<Action>, u8),
 }
 
-#[derive(Debug, Clone)]
-pub enum ActionWrapper {
-    Macro(crate::macro_parser::ActionType),
-    Imaginary(ImaginaryAction),
+impl ActionWrapper {
+    fn calculate_length(&self) -> usize {
+        match self {
+            ActionWrapper::Loop(actions, _) => {
+                let mut length = 2;
+                for action in actions {
+                    length += action.calculate_length();
+                }
+                length
+            }
+            _ => 1,
+        }
+    }
+
+    fn calculate_width(&self) -> usize {
+        match self {
+            ActionWrapper::Loop(actions, _) => {
+                if actions.is_empty() {
+                    1
+                } else {
+                    let mut width = 1;
+                    for action in actions {
+                        width = width.max(action.calculate_width());
+                    }
+
+                    width + 1
+                }
+            },
+            _ => 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct MacroAction {
     action: ActionWrapper,
     delay: Option<Duration>,
-    index: Arc<Mutex<Index>>,
 }
 
 impl MacroAction {
-    fn draw_all(actions: &[Arc<Mutex<MacroAction>>], frame: &mut Frame, theme: &Theme, scroll_offset: Vector, selected: &Option<Index>, drag: &Option<Drag>) {
-        for action in actions {
-            if let Some(drag) = drag {
-                let mut selected = false;
-                for drag_action in drag.actions.iter() {
-                    if Arc::ptr_eq(&drag_action, &action) {
-                        selected = true
-                    }
+    fn calculate_length(&self) -> usize {
+        self.action.calculate_length()
+    }
+
+    fn calculate_width(&self) -> usize {
+        self.action.calculate_width()
+    }
+}
+
+impl From<MacroFrame> for MacroAction {
+    fn from(frame: MacroFrame) -> Self {
+        let action = match frame.action {
+            macro_parser::ActionType::Empty => ActionWrapper::Empty,
+            macro_parser::ActionType::SetLed(color) => ActionWrapper::SetLed(color),
+            macro_parser::ActionType::ClearLed => ActionWrapper::ClearLed,
+            macro_parser::ActionType::KeyDown(key) => ActionWrapper::KeyDown(key),
+            macro_parser::ActionType::KeyUp(key) => ActionWrapper::KeyUp(key),
+            macro_parser::ActionType::KeyPress(key, delay) => ActionWrapper::KeyPress(key, delay),
+            macro_parser::ActionType::ConsumerPress(key, delay) => ActionWrapper::ConsumerPress(key, delay),
+            macro_parser::ActionType::String(string, delay) => ActionWrapper::String(string, delay),
+            macro_parser::ActionType::Chord(keys, delay) => ActionWrapper::Chord(keys, delay),
+            macro_parser::ActionType::Loop(frames, loop_count) => {
+                let mut actions = Vec::new();
+                for frame in frames {
+                    actions.push(Action::from(frame));
                 }
+                ActionWrapper::Loop(actions, loop_count)
+            }
+        };
+        let length = action.calculate_length();
+        MacroAction {
+            action,
+            delay: frame.delay,
+        }
+    }
+}
 
-                if selected {
-                    continue;
+impl From<MacroAction> for MacroFrame {
+    fn from(action: MacroAction) -> Self {
+        MacroFrame {
+            action: match action.action {
+                ActionWrapper::Empty => macro_parser::ActionType::Empty,
+                ActionWrapper::SetLed(color) => macro_parser::ActionType::SetLed(color),
+                ActionWrapper::ClearLed => macro_parser::ActionType::ClearLed,
+                ActionWrapper::KeyDown(key) => macro_parser::ActionType::KeyDown(key),
+                ActionWrapper::KeyUp(key) => macro_parser::ActionType::KeyUp(key),
+                ActionWrapper::KeyPress(key, delay) => macro_parser::ActionType::KeyPress(key, delay),
+                ActionWrapper::ConsumerPress(key, delay) => macro_parser::ActionType::ConsumerPress(key, delay),
+                ActionWrapper::String(string, delay) => macro_parser::ActionType::String(string, delay),
+                ActionWrapper::Chord(keys, delay) => macro_parser::ActionType::Chord(keys, delay),
+                ActionWrapper::Loop(actions, loop_count) => {
+                    let mut frames = Vec::new();
+                    for action in actions {
+                        frames.push(action.into());
+                    }
+                    macro_parser::ActionType::Loop(frames, loop_count)
+                }
+            },
+            delay: action.delay,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Action (Rc<RefCell<MacroAction>>);
+impl Action {
+    pub fn new(action: MacroAction) -> Self {
+        Action(Rc::new(RefCell::new(action)))
+    }
+
+    fn calculate_length(&self) -> usize {
+        self.0.try_borrow().unwrap().calculate_length()
+    }
+
+    fn calculate_width(&self) -> usize {
+        self.0.try_borrow().unwrap().calculate_width()
+    }
+
+    fn max_length(actions: &[Action]) -> usize {
+        let mut length = 0;
+        for action in actions {
+            length = length.max(action.calculate_length());
+        }
+        length
+    }
+
+    fn max_width(actions: &[Action]) -> usize {
+        let mut width = 0;
+        for action in actions {
+            width = width.max(action.calculate_width());
+        }
+        width
+    }
+
+    pub fn get_offset(actions: &[Action], scroll_offset: Vector, point: Point) -> Option<(Action, Vector)> {
+        let mut index = 0;
+        for action in actions {
+            match action.get_action() {
+                ActionWrapper::Loop(actions, _) => {
+                    let top_left = Point::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(top_left, ACTION_SIZE);
+                    if bounds.contains(point) {
+                        return Some((action.clone(), point - top_left))
+                    }
+                    
+                    index += 1;
+                    if let Some(value) = Action::get_offset(actions.as_slice(), scroll_offset - Vector::new(LOOP_PADDING, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)), point) {
+                        return Some(value)
+                    }
+
+                    index += action.calculate_length() - 2;
+    
+                    let bottom_top_left = Point::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(bottom_top_left, ACTION_SIZE);
+                    if bounds.contains(point) {
+                        return Some((action.clone(), point - top_left))
+                    }
+
+                    index += action.calculate_length();
+                },
+
+                _ => {
+                    let top_left = Point::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(top_left, ACTION_SIZE);
+                    if bounds.contains(point) {
+                        return Some((action.clone(), point - top_left))
+                    }
+
+                    index += action.calculate_length();
                 }
             }
-
-            let position = action.try_lock().unwrap().index.try_lock().unwrap().get_top_left(scroll_offset);
-            action.try_lock().unwrap().draw(frame, theme, position, selected);
         }
+
+        None
     }
 
-    fn draw(&self, frame: &mut Frame, theme: &Theme, position: Point, selected: &Option<Index>) {
-        
-            frame.fill_rectangle(position, ACTION_SIZE, {
-                if let Some(selected) = selected {
-                    match selected {
-                        Index::ImaginaryIndex { .. } => unreachable!(),
-                        Index::Index { action_index, .. } => {
-                            if *action_index == self.index.try_lock().unwrap().get_root_action_index() {
-                                Color::from_rgb8(0xFF, 0xFF, 0x00)
-                            } else {
-                                Color::from_rgb8(0x00, 0x00, 0xFF)
-                            }
-                        },
-                        Index::Nested { action_index, .. } => {
-                            if *action_index == self.index.try_lock().unwrap().get_root_action_index() {
-                                Color::from_rgb8(0xFF, 0xFF, 0x00)
-                            } else {
-                                Color::from_rgb8(0x00, 0x00, 0xFF)
-                            }
-                        },
-                    }
-                } else {
-                    Color::from_rgb8(0x00, 0xFF, 0x00)
-                }
-            });
-    
-            // TODO: Will be buggy until iced supports vectorial text https://github.com/iced-rs/iced/pull/1610
-            if self.closeable() {
-                frame.fill_text(canvas::Text {
-                    content: Icon::Close.into(),
-                    position: position + Index::CLOSE_BUTTON_OFFSET,
-                    color: Color::from_rgb8(0xFF, 0x00, 0x00),
-                    size: Index::CLOSE_BUTTON_SIZE.width,
-                    font: ICON_FONT,
-                    horizontal_alignment: iced::alignment::Horizontal::Left,
-                    vertical_alignment: iced::alignment::Vertical::Top,
-                });
-            }
-    
-            // match macro_frame.action {
-            //     crate::macro_parser::ActionType::Loop(frames, _) => {
-            //         *offset = *offset + Vector::new(LOOP_PADDING, 0.0);
-            //         draw_all_frames(frames.as_slice(), frame, theme, offset);
-            //         *offset = *offset - Vector::new(LOOP_PADDING, 0.0);
-            //     },
-    
-            //     _ => {},
-            // }
-    }
-
-    pub fn closeable(&self) -> bool {
-        match self.action {
-            ActionWrapper::Macro(_) => true,
-            ActionWrapper::Imaginary(_) => false,
-        }
-    }
-
-    pub fn get_max_nested_depth(actions: &[Arc<Mutex<MacroAction>>]) -> usize {
-        let mut first = None;
-        let mut max_depth = 0;
-
+    fn index_from_recurse(&self, actions: &[Action], parents: Vec<usize>) -> Result<Index, ()> {
+        let mut index = 0;
         for action in actions {
-            match &*action.try_lock().unwrap().index.try_lock().unwrap() {
-                Index::ImaginaryIndex { .. } => {
-                    if first.is_none() {
-                        first = Some(0);
-                    }
-                },
-                Index::Index { .. } => {
-                    if first.is_none() {
-                        first = Some(0);
-                    }
-                },
-                Index::Nested { parents, .. } => {
-                    if first.is_none() {
-                        first = Some(parents.len());
-                    }
-                    if parents.len() > max_depth {
-                        max_depth = parents.len();
-                    }
-                },
+            if *self == *action {
+                return Ok(Index { index, parents })
             }
-        }
 
-        max_depth - first.unwrap()
-    }
-
-    pub fn get_loop(actions: &[Arc<Mutex<MacroAction>>], index: &Index) -> Vec<Arc<Mutex<MacroAction>>> {
-        let mut loop_actions = Vec::new();
-        let root_index = index.get_root_action_index();
-
-        for action in actions {
-            let action_u = action.try_lock().unwrap();
-            let action_index = action_u.index.try_lock().unwrap().clone();
-            match &action_index {
-                Index::ImaginaryIndex { parent_index, .. } => {
-                    if parent_index.try_lock().unwrap().get_root_action_index() == root_index {
-                        loop_actions.push(action.clone());
-                    }
-                },
-                Index::Index { action_index, .. } => {
-                    if *action_index == root_index {
-                        loop_actions.push(action.clone());
-                    }
-                },
-                Index::Nested { parents, .. } => {
-                    if parents.last().unwrap().try_lock().unwrap().get_root_action_index() == root_index {
-                        loop_actions.push(action.clone());
-                    }
-                },
-            }
-        }
-
-        loop_actions
-    }
-
-    pub fn update_action_indexs(actions: std::slice::IterMut<Arc<Mutex<MacroAction>>>) {
-        for (index,  action) in actions.enumerate() {
-            action.try_lock().unwrap().index.try_lock().unwrap().set_action_index(index);
-        }
-    }
-
-    pub fn from_macro(macro_data: &crate::macro_parser::Macro) -> Vec<Arc<Mutex<MacroAction>>> {
-        let mut actions = Vec::new();
-
-        for (index, frame) in macro_data.frames.iter().enumerate() {
-            let index = Arc::new(Mutex::new(Index::Index { action_index: 0, index }));
-            let action = MacroAction {
-                action: ActionWrapper::Macro(frame.action.clone()),
-                delay: frame.delay,
-                index: index.clone(),
-            };
-
-            actions.push(Arc::new(Mutex::new(action)));
-
-            if let crate::macro_parser::ActionType::Loop(frames, _) = &frame.action {
-                actions.append(&mut MacroAction::from_frames(frames.as_slice(), vec![index.clone()]));
-                
-
-                actions.push(Arc::new(Mutex::new(MacroAction {
-                    action: ActionWrapper::Imaginary(ImaginaryAction::LoopEnd),
-                    delay: frame.delay,
-                    index: Arc::new(Mutex::new(Index::ImaginaryIndex { action_index: 0, parent_index: index.clone() })),
-                })));
-            }
-        }
-
-        MacroAction::update_action_indexs(actions.iter_mut());
-
-        actions
-    }
-
-    fn from_frames(frames: &[MacroFrame], parents: Vec<Arc<Mutex<Index>>>) -> Vec<Arc<Mutex<MacroAction>>> {
-        let mut actions = Vec::new();
-
-        for (index, frame) in frames.iter().enumerate() {
-            let index = Arc::new(Mutex::new(if parents.is_empty() {
-                Index::Index { action_index: 0, index }    
-            } else {
-                Index::Nested { action_index: 0, index, parents: parents.clone() }
-            }));
-            
-            let action = MacroAction {
-                action: ActionWrapper::Macro(frame.action.clone()),
-                delay: frame.delay,
-                index: index.clone(),
-            };
-
-            actions.push(Arc::new(Mutex::new(action)));
-
-            if let crate::macro_parser::ActionType::Loop(frames, _) = &frame.action {
-                actions.append(&mut MacroAction::from_frames(frames.as_slice(), {
+            match action.get_action() {
+                ActionWrapper::Loop(actions, _) => {
                     let mut parents = parents.clone();
-                    parents.push(index.clone());
-                    parents
-                }));
+                    parents.push(index);
+                    if let Ok(index) = self.index_from_recurse(actions.as_slice(), parents) {
+                        return Ok(index)
+                    }
+                },
 
-                actions.push(Arc::new(Mutex::new(MacroAction {
-                    action: ActionWrapper::Macro(frame.action.clone()),
-                    delay: frame.delay,
-                    index: Arc::new(Mutex::new(Index::ImaginaryIndex { action_index: 0, parent_index: index })),
-                })));
+                _ => (),
+            }
+
+            index += 1;
+        }
+
+        Err(())
+    }
+
+    pub fn index_from(&self, actions: &[Action]) -> Result<Index, ()> {
+        self.index_from_recurse(actions, Vec::new())
+    }
+
+    pub fn get_action(&self) -> ActionWrapper {
+        self.0.try_borrow().unwrap().action.clone()
+    }
+
+    pub fn get_delay(&self) -> Option<Duration> {
+        self.0.try_borrow().unwrap().delay.clone()
+    }
+
+    pub fn set_delay(&self, delay: Option<Duration>) {
+        self.0.try_borrow_mut().unwrap().delay = delay;
+    }
+
+    pub fn set_action(&self, action: ActionWrapper) {
+        self.0.try_borrow_mut().unwrap().action = action;
+    }
+
+    pub fn on_close_button(&self, offset: Vector) -> bool {
+        let close_button_bounds = Rectangle::new(
+            Point::ORIGIN + CLOSE_BUTTON_OFFSET,
+            CLOSE_BUTTON_SIZE
+        );
+
+        close_button_bounds.contains(Point::ORIGIN + offset)
+    }
+
+
+    fn draw_all(actions: &[Action], frame: &mut Frame, theme: &Theme, scroll_offset: Vector, selected: &Option<Action>, drag: &Option<Drag>) {
+        let mut index = 0;
+        for action in actions {
+            let position = Point::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+            action.draw(frame, theme, position, selected, drag);
+
+            index += action.calculate_length();
+        }
+    }
+
+    fn draw_base(&self, frame: &mut Frame, theme: &Theme, position: Point, selected: bool, closeable: bool) {
+        // TODO: COLORS
+        let color = if selected {
+            // theme.selected
+            Color::from_rgb8(0x00, 0xFF, 0xFF)
+        } else {
+            // theme.background
+            Color::from_rgb8(0x00, 0x00, 0xFF)
+        };
+        frame.fill_rectangle(position, ACTION_SIZE, color);
+
+        // TODO: Will be buggy until iced supports vectorial text https://github.com/iced-rs/iced/pull/1610
+        if closeable {
+            frame.fill_text(canvas::Text {
+                content: Icon::Close.into(),
+                position: position + CLOSE_BUTTON_OFFSET,
+                color: Color::from_rgb8(0xFF, 0x00, 0x00),
+                size: CLOSE_BUTTON_SIZE.width,
+                font: ICON_FONT,
+                horizontal_alignment: iced::alignment::Horizontal::Left,
+                vertical_alignment: iced::alignment::Vertical::Top,
+            });
+        }
+    }
+
+    fn draw(&self, frame: &mut Frame, theme: &Theme, position: Point, selected: &Option<Action>, drag: &Option<Drag>) {
+        if let Some(drag) = drag {
+            if drag.action == *self {
+                return
             }
         }
 
-        MacroAction::update_action_indexs(actions.iter_mut());
+        let selected_bool = if let Some(selected) = selected {
+            if *selected == *self {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        match self.get_action() {
+            ActionWrapper::Empty => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::SetLed(_) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::ClearLed => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::KeyDown(_) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::KeyUp(_) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::KeyPress(_, _) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::ConsumerPress(_, _) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::String(_, _) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::Chord(_, _) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+            },
+            ActionWrapper::Loop(actions, _) => {
+                self.draw_base(frame, theme, position, selected_bool, true);
+                let mut index = 1;
+                for action in actions {
+                    action.draw(frame, theme, position + Vector::new(LOOP_PADDING, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)), selected, drag);
+                    index += action.calculate_length();
+                }
+
+                self.draw_base(frame, theme, position + Vector::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)), selected_bool, false);
+            },
+        }
+}
+}
+
+impl From<MacroAction> for Action {
+    fn from(action: MacroAction) -> Self {
+        Action::new(action)
+    }
+}
+
+impl From<Action> for MacroAction {
+    fn from(action: Action) -> Self {
+        action.0.try_borrow().unwrap().clone()
+    }
+}
+
+impl From<MacroFrame> for Action {
+    fn from(frame: MacroFrame) -> Self {
+        Action::from(MacroAction::from(frame))
+    }
+}
+
+impl From<Action> for MacroFrame {
+    fn from(action: Action) -> Self {
+        MacroFrame::from(MacroAction::from(action))
+    }
+}
+
+impl PartialEq for Action {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Action {
+    pub fn from_macro(macro_data: &crate::macro_parser::Macro) -> Vec<Action> {
+        return Action::from_frames(&macro_data.frames, Vec::new());
+    }
+
+    fn from_frames(frames: &[MacroFrame], parents: Vec<Arc<Mutex<Index>>>) -> Vec<Action> {
+        let mut actions = Vec::new();
+
+        for frame in frames {
+            actions.push(Action::from(MacroAction::from(frame.clone())));
+        }
 
         actions
     }
