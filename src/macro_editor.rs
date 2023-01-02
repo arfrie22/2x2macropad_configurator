@@ -17,8 +17,10 @@ use crate::macro_parser::{MacroFrame, Macro, self};
 
 
 const CLOSE_BUTTON_PADDING: f32 = 1.0;
-pub const CLOSE_BUTTON_OFFSET: Vector = Vector::new(ACTION_SIZE.width - ACTION_SIZE.height - CLOSE_BUTTON_PADDING, CLOSE_BUTTON_PADDING);
-pub const CLOSE_BUTTON_SIZE: Size = Size::new(ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING), ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING));
+const CLOSE_BUTTON_OFFSET: Vector = Vector::new(ACTION_SIZE.width - ACTION_SIZE.height - CLOSE_BUTTON_PADDING, CLOSE_BUTTON_PADDING);
+const CLOSE_BUTTON_SIZE: Size = Size::new(ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING), ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING));
+
+const MOVE_THRESHOLD: f32 = 5.0;
 
 #[derive(Debug, Clone)]
 pub struct Index {
@@ -327,13 +329,14 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                     mouse::Event::CursorMoved { .. } => {
                         if let Some(cursor_position) = cursor.position_in(&bounds) {
                             match state.0.take() {
-                                Some(Drag { action, drag_offset, moved, to, mut moving, .. }) => {
+                                Some(Drag { action, drag_offset, moved, mut to, mut moving, .. }) => {
                                     if !moved {
-                                        if cursor_position != to {
+                                        if cursor_position.distance(to) > MOVE_THRESHOLD {
                                             *state = (Some(Drag { action, drag_offset, moved: true, to: cursor_position, moving: None }), None); 
                                             return (event::Status::Captured, Some(Message::DragStart));   
                                         }
                                     } else {
+                                        to = cursor_position;
                                         if let Some(index) = moving.take() {
                                             if action.index_from(self.actions).unwrap() != index {
                                                 moving = Some(index);
@@ -349,8 +352,9 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                             }
                                         }
                                     }    
+
+                                    *state = (Some(Drag { action, drag_offset, moved, to, moving }), None);
                                     
-                                    *state = (Some(Drag { action, drag_offset, moved, to: cursor_position, moving }), None);
                                     None
                                 }
                                 _ => None,
