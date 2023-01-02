@@ -601,7 +601,7 @@ impl Action {
     fn max_length(actions: &[Action]) -> usize {
         let mut length = 0;
         for action in actions {
-            length = length.max(action.calculate_length());
+            length += action.calculate_length();
         }
         length
     }

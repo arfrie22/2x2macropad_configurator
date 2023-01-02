@@ -146,6 +146,30 @@ fn main() {
             macropad_wrapper::validate_macro(&d, 6, &macro_data_3).unwrap();
 
 
+            let mut mac4 = Macro::new();
+            for _ in 0..5 {
+                mac4.add_frame(MacroFrame {
+                    action: ActionType::Loop(vec![
+                        MacroFrame {
+                            action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
+                            delay: Some(Duration::from_millis(200)),
+                        },
+                        MacroFrame {
+                            action: ActionType::Chord(vec![Keyboard::A, Keyboard::B], Some(Duration::from_millis(30))),
+                            delay: None,
+                        },
+                    ], 3),
+                    delay: Some(Duration::from_millis(200)),
+                });
+            }
+
+            let macro_data_4 = mac4.pack().unwrap();
+
+            macropad_wrapper::clear_macro(&d, 7).unwrap();
+            macropad_wrapper::set_macro(&d, 7, &macro_data_4).unwrap();
+            macropad_wrapper::validate_macro(&d, 7, &macro_data_4).unwrap();
+
+
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
         }
     }
