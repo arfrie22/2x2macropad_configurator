@@ -36,16 +36,16 @@ impl std::fmt::Display for KeyboardWrapper {
             Keyboard::X => write!(f, "X"),
             Keyboard::Y => write!(f, "Y"),
             Keyboard::Z => write!(f, "Z"),
-            Keyboard::Keyboard1 => write!(f, "Keyboard 1"),
-            Keyboard::Keyboard2 => write!(f, "Keyboard 2"),
-            Keyboard::Keyboard3 => write!(f, "Keyboard 3"),
-            Keyboard::Keyboard4 => write!(f, "Keyboard 4"),
-            Keyboard::Keyboard5 => write!(f, "Keyboard 5"),
-            Keyboard::Keyboard6 => write!(f, "Keyboard 6"),
-            Keyboard::Keyboard7 => write!(f, "Keyboard 7"),
-            Keyboard::Keyboard8 => write!(f, "Keyboard 8"),
-            Keyboard::Keyboard9 => write!(f, "Keyboard 9"),
-            Keyboard::Keyboard0 => write!(f, "Keyboard 0"),
+            Keyboard::Keyboard1 => write!(f, "1"),
+            Keyboard::Keyboard2 => write!(f, "2"),
+            Keyboard::Keyboard3 => write!(f, "3"),
+            Keyboard::Keyboard4 => write!(f, "4"),
+            Keyboard::Keyboard5 => write!(f, "5"),
+            Keyboard::Keyboard6 => write!(f, "6"),
+            Keyboard::Keyboard7 => write!(f, "7"),
+            Keyboard::Keyboard8 => write!(f, "8"),
+            Keyboard::Keyboard9 => write!(f, "9"),
+            Keyboard::Keyboard0 => write!(f, "0"),
             Keyboard::ReturnEnter => write!(f, "Return"),
             Keyboard::Escape => write!(f, "Escape"),
             Keyboard::DeleteBackspace => write!(f, "Backspace"),
@@ -196,8 +196,37 @@ impl From<KeyboardWrapper> for Keyboard {
 }
 
 impl KeyboardWrapper {
-    pub fn get_char(&self, caps: bool) -> char {
-        if caps {
+    pub fn get_chord_string(keys: &Vec<Keyboard> ) -> String {
+        let mut chord = String::new();
+        if keys.contains(&Keyboard::LeftControl) || keys.contains(&Keyboard::RightControl) {
+            chord.push_str("Ctrl + ");
+        }
+
+        if keys.contains(&Keyboard::LeftAlt) || keys.contains(&Keyboard::RightAlt) {
+            chord.push_str("Alt + ");
+        }
+
+        let caps = if keys.contains(&Keyboard::LeftShift) || keys.contains(&Keyboard::RightShift) {
+            chord.push_str("Shift + ");
+            true
+        } else {
+            false
+        };
+
+        if keys.contains(&Keyboard::LeftGUI) || keys.contains(&Keyboard::RightGUI) {
+            chord.push_str("GUI + ");
+        }
+        
+        for key in keys {
+            if let Ok(c) = KeyboardWrapper::from(*key).get_char(caps) {
+                chord.push(c);
+            }
+        }
+        chord
+    }
+
+    pub fn get_char(&self, caps: bool) -> Result<char, ()> {
+        Ok(if caps {
             match self.0 {
                 Keyboard::A => 'A',
                 Keyboard::B => 'B',
@@ -250,7 +279,7 @@ impl KeyboardWrapper {
                 Keyboard::Space => ' ',
                 Keyboard::Tab => '\t',
                 
-                _ => unreachable!(),
+                _ => return Err(()),
             }
         } else {
             match self.0 {
@@ -305,9 +334,9 @@ impl KeyboardWrapper {
                 Keyboard::Space => ' ',
                 Keyboard::Tab => '\t',
                 
-                _ => unreachable!(),
+                _ => return Err(()),
             }
-        }
+        })
     }
 
     pub fn from_char(char: char) -> (Keyboard, Option<bool>) {

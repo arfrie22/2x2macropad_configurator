@@ -137,20 +137,20 @@ where
     fn on_event(
             &mut self,
             _state: &mut widget::Tree,
-            event: iced::Event,
+            event: iced_native::Event,
             layout: Layout<'_>,
             cursor_position: Point,
             _renderer: &Renderer<B, T>,
             _clipboard: &mut dyn iced_native::Clipboard,
             shell: &mut iced_native::Shell<'_, Message>,
-        ) -> iced::event::Status {
+        ) -> iced_native::event::Status {
         if self.interactable {
             if !self.clicked {
-                if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = event {
+                if let iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { .. }) = event {
                     for (i, key) in self.get_keys(&layout.bounds()).iter().enumerate() {
                         if key.contains(cursor_position) {
                             shell.publish(self.hover_message.as_ref().unwrap()(Some(i)));
-                            return iced::event::Status::Captured;
+                            return iced_native::event::Status::Captured;
                         }
                     }
                     shell.publish(self.hover_message.as_ref().unwrap()(None));
@@ -160,18 +160,18 @@ where
 
             if let Some(i) = self.selected {
                 match event {
-                    iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
+                    iced_native::Event::Mouse(iced_native::mouse::Event::ButtonPressed(iced_native::mouse::Button::Left)) => {
                         shell.publish(self.click_message.as_ref().unwrap()(true));
-                        return iced::event::Status::Captured;
+                        return iced_native::event::Status::Captured;
                     }
-                    iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                    iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Left)) => {
                         if self.clicked {
                             if self.get_keys(&layout.bounds())[i].contains(cursor_position) {
                                 shell.publish(self.press_message.as_ref().unwrap()(i));
                             }
                             
                             shell.publish(self.click_message.as_ref().unwrap()(false));
-                            return iced::event::Status::Captured;
+                            return iced_native::event::Status::Captured;
                         }
                     }
                     _ => {}
@@ -179,7 +179,7 @@ where
             }
         }
 
-        iced::event::Status::Ignored
+        iced_native::event::Status::Ignored
     }
 
     fn mouse_interaction(
@@ -195,18 +195,18 @@ where
                     if key.contains(cursor_position) {
                         if let Some(selected) = self.selected {
                             if selected == i {
-                                return iced::mouse::Interaction::Pointer;
+                                return iced_native::mouse::Interaction::Pointer;
                             } else {
                                 break;
                             }
                         } else {
-                            return iced::mouse::Interaction::Pointer;
+                            return iced_native::mouse::Interaction::Pointer;
                         }
                     }
                 }
             }
             
-            iced::mouse::Interaction::default()
+            iced_native::mouse::Interaction::default()
     }
 
     fn draw(

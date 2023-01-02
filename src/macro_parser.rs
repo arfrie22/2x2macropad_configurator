@@ -568,7 +568,7 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                                 if key == Keyboard::LeftShift || key == Keyboard::RightShift {
                                     caps = true;
                                 } else {
-                                    string.push(type_wrapper::KeyboardWrapper::from(key).get_char(caps));
+                                    string.push(type_wrapper::KeyboardWrapper::from(key).get_char(caps).unwrap());
                                 }
                             },
                             ActionType::Chord(keys, _) => {
