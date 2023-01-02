@@ -75,16 +75,39 @@ impl Index {
     //     close_button_bounds.contains(Point::ORIGIN + offset)
     // }
 
-    fn add_to_macro_recurse(index: Index, frame: MacroFrame, root: Action) {
+    fn avoid_collisions(&self, new_index: &mut Index) {
+        if !new_index.parents.is_empty() {
+            if !self.parents.is_empty() {
+                for (i, parent) in new_index.parents.iter_mut().enumerate() {
+                    if self.parents.len() > i {
+                        if self.parents[i] < *parent {
+                            *parent -= 1;
+                            break;
+                        }
+                    } else {
+                        if self.index < *parent {
+                            *parent -= 1;
+                        }
+
+                        break;
+                    }
+                }
+            } else if self.index < *new_index.parents.last().unwrap() {
+                *new_index.parents.last_mut().unwrap() -= 1;
+            }
+        }
+    }
+
+    fn add_to_macro_recurse(index: Index, action: Action, root: Action) {
         if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
                 let mut parent_index = parents.remove(0);
                 let index = Index { index: index.index, parents };
-                Index::add_to_macro_recurse(index, frame, actions[parent_index].clone());
+                Index::add_to_macro_recurse(index, action, actions[parent_index].clone());
             } else {
                 let mut actions = actions.clone();
-                actions.insert(index.index, Action::from(frame));
+                actions.insert(index.index, action);
                 root.set_action(ActionWrapper::Loop(actions, count));
             }
         } else {
@@ -92,17 +115,17 @@ impl Index {
         }
     }
 
-    pub fn add_to_macro(&self, frame: MacroFrame, actions: &mut Vec<Action>) {
+    pub fn add_to_macro(&self, action: Action, actions: &mut Vec<Action>) {
         if !self.parents.is_empty() {
             let mut parents = self.parents.clone();
             let parent_index = parents.remove(0);
-            Index::add_to_macro_recurse(Index {index: self.index, parents}, frame, actions[parent_index].clone());
+            Index::add_to_macro_recurse(Index {index: self.index, parents}, action, actions[parent_index].clone());
         } else {
-            actions.insert(self.index, Action::from(frame));
+            actions.insert(self.index, action);
         }
     }
 
-    fn remove_from_macro_recurse(index: Index, root: Action) -> MacroFrame {
+    fn remove_from_macro_recurse(index: Index, root: Action) -> Action {
         if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
@@ -111,22 +134,22 @@ impl Index {
                 Index::remove_from_macro_recurse(index, actions[parent_index].clone())
             } else {
                 let mut actions = actions.clone();
-                let frame = actions.remove(index.index);
+                let action = actions.remove(index.index);
                 root.set_action(ActionWrapper::Loop(actions, count));
-                frame.into()
+                action
             }
         } else {
             unreachable!()
         }
     }
 
-    pub fn remove_from_macro(&self, actions: &mut Vec<Action>) -> MacroFrame {
+    pub fn remove_from_macro(&self, actions: &mut Vec<Action>) -> Action {
         if !self.parents.is_empty() {
             let mut parents = self.parents.clone();
             let parent_index = parents.remove(0);
             Index::remove_from_macro_recurse(Index {index: self.index, parents}, actions[parent_index].clone())
         } else {
-            actions.remove(self.index).into()
+            actions.remove(self.index)
         }
     }
 
@@ -200,6 +223,7 @@ struct Drag {
     drag_offset: Vector,
     moved: bool,
     to: Point,
+    moving: Option<Index>,
 }
 
 impl Drag {
@@ -278,7 +302,6 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                 if let Some((action, offset)) = Action::get_offset(self.actions, self.state.scroll_offset, cursor_position) {
                                     if action.on_close_button(offset) {
                                         *state = (None, None);
-                                        println!("Close button pressed");
                                         return (event::Status::Captured, Some(Message::RemoveFrame(action.index_from(self.actions).unwrap())));
                                     }
 
@@ -287,6 +310,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                         drag_offset: offset,
                                         moved: false,
                                         to: cursor_position,
+                                        moving: None,
                                     }), None);
 
                                     return (event::Status::Captured, None);
@@ -303,24 +327,31 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                     mouse::Event::CursorMoved { .. } => {
                         if let Some(cursor_position) = cursor.position_in(&bounds) {
                             match state.0.take() {
-                                Some(Drag { action, drag_offset, moved, to, .. }) => {
-                                    let mut message = None;
+                                Some(Drag { action, drag_offset, moved, to, mut moving, .. }) => {
                                     if !moved {
                                         if cursor_position != to {
-                                            message = Some(Message::DragStart);
-                                            *state = (Some(Drag { action, drag_offset, moved: true, to: cursor_position }), None); 
-                                            return (event::Status::Captured, message);   
+                                            *state = (Some(Drag { action, drag_offset, moved: true, to: cursor_position, moving: None }), None); 
+                                            return (event::Status::Captured, Some(Message::DragStart));   
                                         }
                                     } else {
-                                        if let Some((hover_action, offset)) = Action::get_offset(self.actions, self.state.scroll_offset, cursor_position) {
-                                            if action != hover_action {
-                                                message = Some(Message::MoveFrame(action.index_from(self.actions).unwrap(), hover_action.index_from(self.actions).unwrap()));
+                                        if let Some(index) = moving.take() {
+                                            if action.index_from(self.actions).unwrap() != index {
+                                                moving = Some(index);
+                                            }
+                                        } else {
+                                            if let Some(mut index) = Action::get_drag_index(&action, self.actions, self.actions, self.state.scroll_offset, cursor_position) {
+                                                let from_index = action.index_from(self.actions).unwrap();
+                                                from_index.avoid_collisions(&mut index);
+                                                
+                                                let message = Message::MoveFrame(from_index, index.clone());
+                                                *state = (Some(Drag { action, drag_offset, moved, to: cursor_position, moving: Some(index) }), None); 
+                                                return (event::Status::Captured, Some(message));
                                             }
                                         }
-                                    }
-
-                                    *state = (Some(Drag { action, drag_offset, moved, to: cursor_position }), None); 
-                                    return (event::Status::Captured, message);
+                                    }    
+                                    
+                                    *state = (Some(Drag { action, drag_offset, moved, to: cursor_position, moving }), None);
+                                    None
                                 }
                                 _ => None,
                             }
@@ -336,15 +367,6 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                     *state = (None, Some(action));
                                     return (event::Status::Captured, Some(Message::SelectFrame(Some(index))));
                                 }
-                                // for action in self.actions {
-                                //     if let Some(offset) = action.index.get_offset(self.state.scroll_offset, cursor_position) {
-                                //         if Index::on_close_button(offset) {
-                                //             return (event::Status::Captured, Some(Message::RemoveFrame(action.index.clone())));
-                                //         }
-
-                                //         return (event::Status::Captured, Some(Message::MoveFrame(from, action.index.clone())));
-                                //     }
-                                // }
 
                                 return (event::Status::Captured, Some(Message::ReleaseGrab));
                             }
@@ -397,13 +419,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
 
                     let position = Point::new(
                         LOOP_PADDING * index.parents.len() as f32,
-                        {
-                            let mut y = index.index;
-                            for parent in index.parents {
-                                y += parent + 1;
-                            }
-                            y as f32 * (ACTION_SIZE.height + ACTION_PADDING)
-                        },
+                        drag.action.get_count_to(self.actions, Vec::new(), 0).unwrap() as f32 * (ACTION_SIZE.height + ACTION_PADDING)
                     ) - self.state.scroll_offset;
                     
                     frame.stroke(
@@ -618,7 +634,7 @@ impl Action {
                         return Some((action.clone(), point - top_left))
                     }
 
-                    index += action.calculate_length();
+                    index += 1;
                 },
 
                 _ => {
@@ -634,6 +650,106 @@ impl Action {
         }
 
         None
+    }
+
+    pub fn get_drag_index(drag_action: &Action, actions: &[Action], all_actions: &[Action], scroll_offset: Vector, point: Point) -> Option<Index> {
+        let mut index = 0;
+        for action in actions {
+            if drag_action.contains(action) {
+                index += action.calculate_length();
+                continue
+            }
+            match action.get_action() {
+                ActionWrapper::Loop(loop_actions, _) => {
+                    let loop_index = action.index_from(all_actions).unwrap();
+                    let top_left = Point::new(-LOOP_PADDING, (index as f32 - 0.5) * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + (LOOP_PADDING * 2.0), ACTION_SIZE.height + ACTION_PADDING));
+                    if bounds.contains(point) {
+                        return Some(loop_index)
+                    }
+                    
+                    index += 1;
+
+                    if !loop_actions.is_empty() {
+                        if let Some(value) = Action::get_drag_index(drag_action, loop_actions.as_slice(), actions, scroll_offset - Vector::new(LOOP_PADDING, index as f32 * (ACTION_SIZE.height + ACTION_PADDING)), point) {
+                            return Some(value)
+                        }
+
+                        index += action.calculate_length() - 2;
+                    }
+    
+                    let top_left = Point::new(-LOOP_PADDING, (index as f32 - 0.5) * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + (LOOP_PADDING * 2.0), ACTION_SIZE.height + ACTION_PADDING));
+                    if bounds.contains(point) {
+                        let mut parents = loop_index.parents.clone();
+                        let drag_index = drag_action.index_from(all_actions).unwrap();
+                        parents.push(loop_index.index);
+                        let index = Index { index: if drag_index.parents == parents {
+                            loop_actions.len() - 1
+                        } else {
+                            loop_actions.len()
+                        }, parents };
+                        if index != drag_index {
+                            return Some(index)
+                        }
+                    }
+
+                    index += 1;
+                },
+
+                _ => {
+                    let top_left = Point::new(-LOOP_PADDING, (index as f32 - 0.5) * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+                    let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + (LOOP_PADDING * 2.0), ACTION_SIZE.height + ACTION_PADDING));
+                    if bounds.contains(point) {
+                        return Some(action.index_from(all_actions).unwrap())
+                    }
+
+                    index += action.calculate_length();
+                }
+            }
+        }
+
+        let top_left = Point::new(-LOOP_PADDING, (index as f32 - 0.5) * (ACTION_SIZE.height + ACTION_PADDING)) - scroll_offset;
+        let bounds = Rectangle::new(top_left, Size::new(ACTION_SIZE.width + (LOOP_PADDING * 2.0), ACTION_SIZE.height + ACTION_PADDING));
+        if bounds.contains(point) {
+            let last = actions.last().unwrap();
+            if !drag_action.contains(last) {
+                let index = last.index_from(all_actions).unwrap();
+                return Some(Index { index: if index.parents == drag_action.index_from(all_actions).unwrap().parents {
+                    index.index
+                } else {
+                    index.index + 1
+                }, parents: index.parents })
+            }
+        }
+
+        None
+    }
+
+    pub fn get_count_to(&self, actions: &[Action], parents: Vec<usize>, index: usize) -> Result<usize, ()> {
+        let mut index = index;
+        for action in actions {
+            if *self == *action {
+                return Ok(index)
+            }
+
+            match action.get_action() {
+                ActionWrapper::Loop(actions, _) => {
+                    index += 1;
+                    let mut parents = parents.clone();
+                    parents.push(index);
+                    if let Ok(index) = self.get_count_to(actions.as_slice(), parents, index) {
+                        return Ok(index)
+                    } else {
+                        index += action.calculate_length() - 1;
+                    }
+                },
+
+                _ => index += 1,
+            }
+        }
+
+        Err(())
     }
 
     fn index_from_recurse(&self, actions: &[Action], parents: Vec<usize>) -> Result<Index, ()> {
@@ -816,6 +932,25 @@ impl PartialEq for Action {
 }
 
 impl Action {
+    pub fn contains(&self, action: &Action) -> bool {
+        if self == action {
+            return true
+        }
+
+        match self.get_action() {
+            ActionWrapper::Loop(actions, _) => {
+                for loop_action in actions {
+                    if loop_action.contains(action) {
+                        return true
+                    }
+                }
+            },
+            _ => {}
+        }
+
+        false
+    }
+
     pub fn from_macro(macro_data: &crate::macro_parser::Macro) -> Vec<Action> {
         return Action::from_frames(&macro_data.frames, Vec::new());
     }
