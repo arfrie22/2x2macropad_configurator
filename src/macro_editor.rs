@@ -1403,6 +1403,16 @@ impl Action {
 
         actions
     }
+
+    pub fn to_macro(actions: &[Action]) -> crate::macro_parser::Macro {
+        let mut frames = Vec::new();
+
+        for action in actions {
+            frames.push(MacroFrame::from(action.clone()));
+        }
+
+        crate::macro_parser::Macro { frames }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

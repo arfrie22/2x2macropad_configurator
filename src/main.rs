@@ -5,30 +5,29 @@ use std::time::{Duration, Instant};
 use iced::subscription::{events, events_with};
 use iced::theme::Button;
 use iced::widget::{
-    button, column, container, pane_grid, pick_list, progress_bar, row, slider, text, text_input,
-    Column, Container, Row, Space, Text, radio,
+    button, column, container, pane_grid, pick_list, progress_bar, radio, row, slider, text,
+    text_input, Column, Container, Row, Space, Text,
 };
 use iced::{alignment, executor, window, Color, Font, Padding, Size};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
-use iced_aw::style::TabBarStyles;
-use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs};
+use iced_aw::style::{TabBarStyles, BadgeStyles};
+use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs, Badge};
 use iced_native::widget::space;
-use macropad_configurator::font::{ROBOTO, ICON_FONT, Icon};
+use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_editor::Action;
-use macropad_configurator::macro_parser::{LedConfig, ActionType, MacroFrame};
-use macropad_configurator::type_wrapper::{KeyboardWrapper, ConsumerWrapper};
-use macropad_configurator::{hid_manager, macro_parser, macropad, macropad_wrapper, type_wrapper, macro_editor};
+use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
+use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper};
+use macropad_configurator::{
+    hid_manager, macro_editor, macro_parser, macropad, macropad_wrapper, type_wrapper,
+};
 use macropad_protocol::data_protocol::LedEffect;
 use macropad_protocol::macro_protocol;
 use num_enum::{FromPrimitive, IntoPrimitive};
-use usbd_human_interface_device::page::{Keyboard, Consumer};
-
-
+use usbd_human_interface_device::page::{Consumer, Keyboard};
 
 const ACTION_DELAY: u64 = 200;
-
 
 const HEADER_SIZE: u16 = 32;
 const TAB_PADDING: u16 = 16;
@@ -70,6 +69,7 @@ pub enum Message {
     TabSelected(usize),
     KeyModeChanged(macropad_protocol::data_protocol::KeyMode),
     LoadMacro(macro_parser::MacroType),
+    SaveMacro,
     KeyboardDataChanged(KeyboardWrapper),
     ConsumerDataChanged(ConsumerWrapper),
     KeyPickColor,
@@ -237,40 +237,49 @@ impl Application for Configurator {
             Message::LoadMacro(macro_type) => {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     let macros = con.get_macropad().lock().unwrap().macros[*i as usize].clone();
-                    self.key_tab.active_macro = match macro_type {
-                        macro_parser::MacroType::Tap => {
-                            macros.tap.clone()
-                        },
-                        macro_parser::MacroType::Hold => {
-                            macros.hold.clone()
-                        },
-                        macro_parser::MacroType::DoubleTap => {
-                            macros.double_tap.clone()
-                        },
-                        macro_parser::MacroType::TapHold => {
-                            macros.tap_hold.clone()
-                        },
-                    };
-                    self.key_tab.editor_actions = macro_editor::Action::from_macro(&self.key_tab.active_macro);
+                    self.key_tab.editor_actions =
+                        macro_editor::Action::from_macro(&match macro_type {
+                            macro_parser::MacroType::Tap => macros.tap.clone(),
+                            macro_parser::MacroType::Hold => macros.hold.clone(),
+                            macro_parser::MacroType::DoubleTap => macros.double_tap.clone(),
+                            macro_parser::MacroType::TapHold => macros.tap_hold.clone(),
+                        });
+
                     self.key_tab.editor.reset_scroll();
                     self.key_tab.editor.request_redraw();
 
-                    self.state = State::Connected(
-                        con.clone(),
-                        Page::EditMacro(*i, macro_type.clone()),
-                    );
+                    self.state =
+                        State::Connected(con.clone(), Page::EditMacro(*i, macro_type.clone()));
+                }
+            }
+            Message::SaveMacro => {
+                if let State::Connected(con, Page::EditMacro(i, macro_type)) = &mut self.state {
+                    con.send(hid_manager::Message::Set(
+                        hid_manager::MacropadCommand::Macro(
+                            ((*i as u8) << 2) + (macro_type.clone() as u8),
+                            macro_editor::Action::to_macro(
+                                self.key_tab.editor_actions.as_slice(),
+                            ),
+                        ),
+                    ));
                 }
             }
             Message::KeyboardDataChanged(data) => {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
-                        .queue_action(hid_manager::MacropadCommand::KeyboardData(*i as u8, data.into()));
+                        .queue_action(hid_manager::MacropadCommand::KeyboardData(
+                            *i as u8,
+                            data.into(),
+                        ));
                 }
             }
             Message::ConsumerDataChanged(data) => {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
-                        .queue_action(hid_manager::MacropadCommand::ConsumerData(*i as u8, data.into()));
+                        .queue_action(hid_manager::MacropadCommand::ConsumerData(
+                            *i as u8,
+                            data.into(),
+                        ));
                 }
             }
             Message::KeyPickColor => {
@@ -285,7 +294,10 @@ impl Application for Configurator {
                 if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
                     let c = color.into_rgba8();
                     self.key_tab
-                        .queue_action(hid_manager::MacropadCommand::KeyColor(*i as u8, (c[0], c[1], c[2])));
+                        .queue_action(hid_manager::MacropadCommand::KeyColor(
+                            *i as u8,
+                            (c[0], c[1], c[2]),
+                        ));
                 }
                 self.key_tab.show_picker = false;
             }
@@ -464,49 +476,52 @@ impl Application for Configurator {
             State::Connected(_, Page::ModifyKey(i)) => {
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
                     macropad_protocol::data_protocol::KeyMode::MacroMode => {
-                        column![
-                            container(column![
-                                text("Key Mode").font(ROBOTO).size(30),
-                                row![
-                                    button("Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Double Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::DoubleTap)),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Tap and Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::TapHold)),
-                                ],
-                            ])
-                            .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
-                            }),
-                        ]
-                    },
+                        column![container(column![
+                            text("Key Mode").font(ROBOTO).size(30),
+                            row![
+                                button("Tap Macro")
+                                    .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
+                                Space::with_width(Length::Units(20)),
+                                button("Hold Macro")
+                                    .on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
+                                Space::with_width(Length::Units(20)),
+                                button("Double Tap Macro").on_press(Message::LoadMacro(
+                                    macro_parser::MacroType::DoubleTap
+                                )),
+                                Space::with_width(Length::Units(20)),
+                                button("Tap and Hold Macro")
+                                    .on_press(Message::LoadMacro(macro_parser::MacroType::TapHold)),
+                            ],
+                        ])
+                        .padding(Padding {
+                            top: 20,
+                            right: 0,
+                            bottom: 20,
+                            left: 0,
+                        }),]
+                    }
                     macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
-                        column![
-                            container(column![
-                                text("Key Mode").font(ROBOTO).size(30),
-                                row![
-                                    button("Tap Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Hold Macro").on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Double Tap Macro"),
-                                    Space::with_width(Length::Units(20)),
-                                    button("Tap and Hold Macro"),
-                                ],
-                            ])
-                            .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
-                            }),
-                        ]
-                    },
+                        column![container(column![
+                            text("Key Mode").font(ROBOTO).size(30),
+                            row![
+                                button("Tap Macro")
+                                    .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
+                                Space::with_width(Length::Units(20)),
+                                button("Hold Macro")
+                                    .on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
+                                Space::with_width(Length::Units(20)),
+                                button("Double Tap Macro"),
+                                Space::with_width(Length::Units(20)),
+                                button("Tap and Hold Macro"),
+                            ],
+                        ])
+                        .padding(Padding {
+                            top: 20,
+                            right: 0,
+                            bottom: 20,
+                            left: 0,
+                        }),]
+                    }
                     macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
                         column![
                             container(column![
@@ -544,7 +559,7 @@ impl Application for Configurator {
                                 left: 0,
                             }),
                         ]
-                    },
+                    }
                     macropad_protocol::data_protocol::KeyMode::ConsumerMode => {
                         column![
                             container(column![
@@ -582,37 +597,58 @@ impl Application for Configurator {
                                 left: 0,
                             }),
                         ]
-                    },
+                    }
                 };
 
-                
                 let selected_key_mode = Some(self.key_tab.key_configs[*i].key_mode);
                 let message = column![
-                    container(
-                        row![
-                            container(button("Back")
+                    container(row![
+                        container(
+                            button("Back")
                                 .on_press(Message::ReturnToMainPage)
                                 .width(Length::Shrink)
                                 .height(Length::Shrink)
-                            ).align_x(iced::alignment::Horizontal::Left),
-                            text(format!("Modify Key {}", i))
-                                .font(ROBOTO)
-                                .size(60)
-                                .width(Length::Fill)
-                                .horizontal_alignment(iced::alignment::Horizontal::Center),
-                        ]).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top),
-                    
+                        )
+                        .align_x(iced::alignment::Horizontal::Left),
+                        text(format!("Modify Key {}", i))
+                            .font(ROBOTO)
+                            .size(60)
+                            .width(Length::Fill)
+                            .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    ])
+                    .align_x(alignment::Horizontal::Center)
+                    .align_y(alignment::Vertical::Top),
                     container(column![
                         container(column![
                             text("Key Mode").font(ROBOTO).size(30),
                             row![
-                                radio("Macro Mode", macropad_protocol::data_protocol::KeyMode::MacroMode, selected_key_mode, Message::KeyModeChanged),
+                                radio(
+                                    "Macro Mode",
+                                    macropad_protocol::data_protocol::KeyMode::MacroMode,
+                                    selected_key_mode,
+                                    Message::KeyModeChanged
+                                ),
                                 Space::with_width(Length::Units(20)),
-                                radio("Single Tap Mode", macropad_protocol::data_protocol::KeyMode::SingleTapMode, selected_key_mode, Message::KeyModeChanged),
+                                radio(
+                                    "Single Tap Mode",
+                                    macropad_protocol::data_protocol::KeyMode::SingleTapMode,
+                                    selected_key_mode,
+                                    Message::KeyModeChanged
+                                ),
                                 Space::with_width(Length::Units(20)),
-                                radio("Keyboard Mode", macropad_protocol::data_protocol::KeyMode::KeyboardMode, selected_key_mode, Message::KeyModeChanged),
+                                radio(
+                                    "Keyboard Mode",
+                                    macropad_protocol::data_protocol::KeyMode::KeyboardMode,
+                                    selected_key_mode,
+                                    Message::KeyModeChanged
+                                ),
                                 Space::with_width(Length::Units(20)),
-                                radio("Consumer Mode", macropad_protocol::data_protocol::KeyMode::ConsumerMode, selected_key_mode, Message::KeyModeChanged),
+                                radio(
+                                    "Consumer Mode",
+                                    macropad_protocol::data_protocol::KeyMode::ConsumerMode,
+                                    selected_key_mode,
+                                    Message::KeyModeChanged
+                                ),
                             ],
                         ])
                         .padding(Padding {
@@ -622,7 +658,12 @@ impl Application for Configurator {
                             left: 0,
                         }),
                         key_settings,
-                    ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(20)
+                    ])
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(alignment::Horizontal::Center)
+                    .align_y(alignment::Vertical::Top)
+                    .padding(20)
                 ];
 
                 container(message)
@@ -634,12 +675,25 @@ impl Application for Configurator {
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
+                let macro_size = macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()).size();
                 let message = column![
-                    text(format!("Edit {:?} Macro {:?}", macro_type, i)).font(ROBOTO).size(60),
+                    text(format!("Edit {:?} Macro {:?}", macro_type, i))
+                        .font(ROBOTO)
+                        .size(60),
                     button("Back").on_press(Message::ButtonPressed(*i)),
-                    self.key_tab.editor.view(&self.key_tab.editor_actions.as_slice()).map(Message::EditorMessage),
+                    self.key_tab
+                        .editor
+                        .view(&self.key_tab.editor_actions.as_slice())
+                        .map(Message::EditorMessage),
+                    Badge::new(Text::new(format!("{}/4092", macro_size))).style(if macro_size > 4092 {
+                            BadgeStyles::Danger
+                        } else if macro_size > 4000 {
+                            BadgeStyles::Warning
+                        } else {
+                            BadgeStyles::Success
+                        }),
                 ];
-
+                
                 container(message)
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -647,10 +701,8 @@ impl Application for Configurator {
                     .center_y()
                     .padding(100)
                     .into()
-                // todo!()
             }
         }
-        
     }
 
     fn theme(&self) -> Theme {
@@ -713,8 +765,6 @@ struct KeyTab {
     clicked: bool,
     show_picker: bool,
     key_configs: Vec<macro_parser::KeyConfig>,
-    macros: Vec<macro_parser::MacroCollection>,
-    active_macro: macro_parser::Macro,
     editor: macro_editor::State,
     editor_actions: Vec<Action>,
     actions: HashMap<
@@ -731,8 +781,6 @@ impl KeyTab {
             clicked: false,
             show_picker: false,
             key_configs: macropad.key_configs.clone(),
-            macros: macropad.macros.clone(),
-            active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
             actions: HashMap::new(),
@@ -742,7 +790,6 @@ impl KeyTab {
     fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
         let macropad = macropad.lock().unwrap().clone();
         self.key_configs = macropad.key_configs.clone();
-        self.macros = macropad.macros.clone();
     }
 
     fn run_actions(&mut self, con: &mut Connection) {
@@ -813,8 +860,6 @@ impl Default for KeyTab {
             clicked: false,
             show_picker: false,
             key_configs: Vec::new(),
-            macros: Vec::new(),
-            active_macro: macro_parser::Macro::default(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
             actions: HashMap::new(),
@@ -840,7 +885,10 @@ impl Tab for KeyTab {
                 .size(60)
                 .width(Length::Fill)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
-            macropad::macropad_button(self.selected_key, self.clicked).on_press(Message::ButtonPressed).on_hover(Message::ButtonHovered).on_click(Message::ButtonClicked),
+            macropad::macropad_button(self.selected_key, self.clicked)
+                .on_press(Message::ButtonPressed)
+                .on_hover(Message::ButtonHovered)
+                .on_click(Message::ButtonClicked),
         ];
 
         container(message)
@@ -1190,21 +1238,23 @@ impl Tab for SettingsTab {
     }
 
     fn content(&self) -> Element<'_, Self::Message> {
-        
         let message = column![
-            container(button(
-                text(char::from(match self.theme {
-                    Theme::Light => Icon::Sun,
-                    Theme::Dark => Icon::Moon,
-                    _ => Icon::Sun,
-                }))
-                .font(ICON_FONT)
-                .size(30)
-                
+            container(
+                button(
+                    text(char::from(match self.theme {
+                        Theme::Light => Icon::Sun,
+                        Theme::Dark => Icon::Moon,
+                        _ => Icon::Sun,
+                    }))
+                    .font(ICON_FONT)
+                    .size(30)
+                )
+                .on_press(Message::SwitchTheme)
+                .style(Button::Text)
             )
-            .on_press(Message::SwitchTheme)
-            .style(Button::Text)
-            ).width(Length::Fill).align_x(alignment::Horizontal::Right).align_y(alignment::Vertical::Top),
+            .width(Length::Fill)
+            .align_x(alignment::Horizontal::Right)
+            .align_y(alignment::Vertical::Top),
             container(column![
                 container(column![
                     text("Press Time (ms)").font(ROBOTO).size(30),
@@ -1254,7 +1304,12 @@ impl Tab for SettingsTab {
                     bottom: 20,
                     left: 0,
                 }),
-            ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(20),
+            ])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(alignment::Horizontal::Center)
+            .align_y(alignment::Vertical::Top)
+            .padding(20),
         ];
 
         container(message)
@@ -1266,4 +1321,3 @@ impl Tab for SettingsTab {
             .into()
     }
 }
-

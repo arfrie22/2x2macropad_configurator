@@ -849,7 +849,16 @@ impl Macro {
         self.frames.push(frame);
     }
 
-    pub fn pack(&self) -> Result<[u8; 4092], ()> {
+    pub fn size(&self) -> usize {
+        let mut i = 0;
+        for frame in self.frames.iter() {
+            i += frame.pack().len();
+        }
+
+        i
+    }
+
+    pub fn pack(&self) -> Result<([u8; 4092]), ()> {
         let mut data = [0; 4092];
 
         let mut i = 0;
