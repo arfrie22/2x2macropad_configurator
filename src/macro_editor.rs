@@ -49,6 +49,40 @@ impl Index {
         self.parents.len()
     }
 
+    fn get_action_recurse(index: Index, root: Action) -> Action {
+        if let ActionWrapper::Loop(actions, _) = root.get_action() {
+            if !index.parents.is_empty() {
+                let mut parents = index.parents.clone();
+                let parent_index = parents.remove(0);
+                let index = Index {
+                    index: index.index,
+                    parents,
+                };
+                Index::get_action_recurse(index, actions[parent_index].clone())
+            } else {
+                actions[index.index].clone()
+            }
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn get_action(&self, actions: &[Action]) -> Action {
+        if !self.parents.is_empty() {
+            let mut parents = self.parents.clone();
+            let parent_index = parents.remove(0);
+            Index::get_action_recurse(
+                Index {
+                    index: self.index,
+                    parents,
+                },
+                actions[parent_index].clone(),
+            )
+        } else {
+            actions[self.index].clone()
+        }
+    }
+
     // pub fn get_top_left(&self, scroll_offset: Vector) -> Point {
     //     match self {
     //         Index::ImaginaryIndex { action_index, parent_index } => {
@@ -201,11 +235,153 @@ impl PartialEq for Index {
 }
 
 #[derive(Debug, Clone)]
+pub enum ActionOptions {
+    Empty,
+    SetLed((u8, u8, u8)),
+    ClearLed,
+    KeyDown(usbd_human_interface_device::page::Keyboard),
+    KeyUp(usbd_human_interface_device::page::Keyboard),
+    KeyPress(
+        usbd_human_interface_device::page::Keyboard,
+        Option<Duration>,
+    ),
+    ConsumerPress(
+        usbd_human_interface_device::page::Consumer,
+        Option<Duration>,
+    ),
+    String(String, Option<Duration>),
+    Chord(
+        Vec<usbd_human_interface_device::page::Keyboard>,
+        Option<Duration>,
+    ),
+    Loop(u8),
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectedAction {
+    pub index: Index,
+    pub action_options: ActionOptions,
+    pub delay: Option<Duration>,
+}
+
+impl SelectedAction {
+    pub fn new(action: &Action, index: Index) -> Self {
+        let action_options = match action.get_action() {
+            ActionWrapper::SetLed(color) => ActionOptions::SetLed(color),
+            ActionWrapper::ClearLed => ActionOptions::ClearLed,
+            ActionWrapper::KeyDown(key) => ActionOptions::KeyDown(key),
+            ActionWrapper::KeyUp(key) => ActionOptions::KeyUp(key),
+            ActionWrapper::KeyPress(key, delay) => ActionOptions::KeyPress(key, delay),
+            ActionWrapper::ConsumerPress(key, delay) => {
+                ActionOptions::ConsumerPress(key, delay)
+            }
+            ActionWrapper::String(string, delay) => ActionOptions::String(string, delay),
+            ActionWrapper::Chord(keys, delay) => ActionOptions::Chord(keys, delay),
+            ActionWrapper::Loop(_, count) => ActionOptions::Loop(count),
+            ActionWrapper::Empty => ActionOptions::Empty,
+        };
+
+        Self {
+            index,
+            action_options,
+            delay: action.get_delay(),
+        }
+    }
+
+    pub fn from_action(action: &Action, actions: &[Action]) -> Self {
+        Self::new(action, action.index_from(actions).unwrap())
+    }
+
+    pub fn from_index(index: &Index, actions: &[Action]) -> Self {
+        Self::new(&index.get_action(actions), index.clone())
+    }
+
+    pub fn update_action(&self, actions: &[Action]) {
+        let action = self.index.get_action(actions);
+
+        match &self.action_options {
+            ActionOptions::Empty => {
+                if let ActionWrapper::Empty = action.get_action() {
+                    action.set_action(ActionWrapper::Empty);
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::SetLed(color) => {
+                if let ActionWrapper::SetLed(_) = action.get_action() {
+                    action.set_action(ActionWrapper::SetLed(*color));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::ClearLed => {
+                if let ActionWrapper::ClearLed = action.get_action() {
+                    action.set_action(ActionWrapper::ClearLed);
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::KeyDown(key) => {
+                if let ActionWrapper::KeyDown(_) = action.get_action() {
+                    action.set_action(ActionWrapper::KeyDown(*key));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::KeyUp(key) => {
+                if let ActionWrapper::KeyUp(_) = action.get_action() {
+                    action.set_action(ActionWrapper::KeyUp(*key));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::KeyPress(key, delay) => {
+                if let ActionWrapper::KeyPress(_, _) = action.get_action() {
+                    action.set_action(ActionWrapper::KeyPress(*key, *delay));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::ConsumerPress(key, delay) => {
+                if let ActionWrapper::ConsumerPress(_, _) = action.get_action() {
+                    action.set_action(ActionWrapper::ConsumerPress(*key, *delay));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::String(string, delay) => {
+                if let ActionWrapper::String(_, _) = action.get_action() {
+                    action.set_action(ActionWrapper::String(string.clone(), *delay));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::Chord(keys, delay) => {
+                if let ActionWrapper::Chord(_, _) = action.get_action() {
+                    action.set_action(ActionWrapper::Chord(keys.clone(), *delay));
+                } else {
+                    unreachable!()
+                }
+            },
+            ActionOptions::Loop(count) => {
+                if let ActionWrapper::Loop(actions, _) = action.get_action() {
+                    action.set_action(ActionWrapper::Loop(actions.clone(), *count));
+                } else {
+                    unreachable!()
+                }
+            },
+        }
+
+        action.set_delay(self.delay);
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Message {
     MoveFrame(Index, Index),
     RemoveFrame(Index),
     AddFrame(MacroFrame, Index),
-    SelectFrame(Option<Index>),
+    SelectFrame(Option<SelectedAction>),
     ReleaseGrab,
     DragStart,
     Scroll(Vector),
@@ -215,7 +391,6 @@ pub enum Message {
 pub struct State {
     cache: canvas::Cache,
     scroll_offset: Vector,
-    size_bounds: Rectangle,
 }
 
 const ACTION_SIZE: Size = Size::new(600.0, 50.0);
@@ -456,14 +631,14 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                     }
                     mouse::Event::ButtonReleased(mouse::Button::Left) => match state.0.take() {
                         Some(Drag {
-                            action, moved, to, ..
+                            action, moved, ..
                         }) => {
                             if !moved {
-                                let index = action.index_from(self.actions).unwrap();
+                                let selected = Some(SelectedAction::from_action(&action, self.actions));
                                 *state = (None, Some(action));
                                 return (
                                     event::Status::Captured,
-                                    Some(Message::SelectFrame(Some(index))),
+                                    Some(Message::SelectFrame(selected)),
                                 );
                             }
 

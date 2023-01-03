@@ -12,11 +12,11 @@ use iced::{alignment, executor, window, Color, Font, Padding, Size};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
 use iced_aw::style::{TabBarStyles, BadgeStyles};
 use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs, Badge};
-use iced_native::widget::space;
+use iced_native::widget::{space, checkbox};
 use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_editor::{Action, MacroAction};
+use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction};
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
 use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper};
 use macropad_configurator::{
@@ -87,6 +87,18 @@ pub enum Message {
     HoldTimeChangedText(String),
     DefaultDelayChangedText(String),
     SwitchTheme,
+    SelectedActionUseDefaultDelay(bool),
+    MacroActionDelayChangedText(String),
+    MacroActionPickColor,
+    MacroActionCancelColor,
+    MacroActionSubmitColor(Color),
+    MacroActionChooseKey(KeyboardWrapper),
+    MacroActionChooseConsumer(ConsumerWrapper),
+    SelectedActionSubUseDefaultDelay(bool),
+    MacroActionSubDelayChangedText(String),
+    MacroActionStringChangedText(String),
+    MacroActionChordChangedText(String),
+    MacroActionLoopCountChangedText(String),
 }
 
 impl Application for Configurator {
@@ -119,29 +131,29 @@ impl Application for Configurator {
         match message {
             Message::EditorMessage(macro_editor::Message::MoveFrame(old_index, new_index)) => {
                 old_index.move_in_macro(new_index, &mut self.key_tab.editor_actions);
+                self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
                 index.remove_from_macro(&mut self.key_tab.editor_actions);
-
-                // let frame = MacroFrame {
-                //     action: ActionType::Empty,
-                //     delay: Some(Duration::ZERO),
-                // };
-                // index.add_to_macro(frame, &mut self.key_tab.editor_actions);
+                self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
                 index.add_to_macro(frame.into(), &mut self.key_tab.editor_actions);
+                self.key_tab.select(Some(SelectedAction::from_index(&index, self.key_tab.editor_actions.as_slice())));
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::SelectFrame(index)) => {
+                self.key_tab.select(index);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::ReleaseGrab) => {
+                self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::DragStart) => {
+                self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::Scroll(offset)) => {
@@ -245,6 +257,7 @@ impl Application for Configurator {
                             macro_parser::MacroType::TapHold => macros.tap_hold.clone(),
                         });
 
+                    self.key_tab.select(None);
                     self.key_tab.editor.reset_scroll();
                     self.key_tab.editor.request_redraw();
 
@@ -354,55 +367,34 @@ impl Application for Configurator {
                 self.led_tab.show_picker = false;
             }
             Message::PressTimeChangedText(text) => {
-                if let Ok(speed) = text.parse::<f32>() {
-                    let speed = (speed * 1000.0).trunc() / 1000.0;
-                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
-                        if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
-                            self.settings_tab.press_time_text = format!("{:.3}", speed);
-                        } else {
-                            self.settings_tab.press_time_text = text;
-                        }
-                        self.settings_tab
+                if let Ok(speed) = text.parse::<u32>() {
+                    self.settings_tab.press_time_text = text;
+                    self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::TapSpeed(
-                                (speed * 1000.0) as u32,
+                                speed * 1000,
                             ));
-                    }
                 } else if text == "" {
                     self.settings_tab.press_time_text = text;
                 }
             }
             Message::HoldTimeChangedText(text) => {
-                if let Ok(speed) = text.parse::<f32>() {
-                    let speed = (speed * 1000.0).trunc() / 1000.0;
-                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
-                        if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
-                            self.settings_tab.hold_time_text = format!("{:.3}", speed);
-                        } else {
-                            self.settings_tab.hold_time_text = text;
-                        }
-                        self.settings_tab
+                if let Ok(speed) = text.parse::<u32>() {
+                    self.settings_tab.hold_time_text = text;
+                    self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::HoldSpeed(
-                                (speed * 1000.0) as u32,
+                                speed * 1000,
                             ));
-                    }
                 } else if text == "" {
                     self.settings_tab.hold_time_text = text;
                 }
             }
             Message::DefaultDelayChangedText(text) => {
-                if let Ok(speed) = text.parse::<f32>() {
-                    let speed = (speed * 1000.0).trunc() / 1000.0;
-                    if speed != 0.0 && (0.0..=u32::MAX as f32).contains(&speed) {
-                        if text.contains(".") && text.split('.').last().unwrap().len() > 3 {
-                            self.settings_tab.default_delay_text = format!("{:.3}", speed);
-                        } else {
-                            self.settings_tab.default_delay_text = text;
-                        }
-                        self.settings_tab
+                if let Ok(speed) = text.parse::<u32>() {
+                    self.settings_tab.default_delay_text = text;
+                    self.settings_tab
                             .queue_action(hid_manager::MacropadCommand::DefaultDelay(
-                                (speed * 1000.0) as u32,
+                                speed * 1000,
                             ));
-                    }
                 } else if text == "" {
                     self.settings_tab.default_delay_text = text;
                 }
@@ -415,6 +407,183 @@ impl Application for Configurator {
                 };
                 self.settings_tab.theme = self.theme.clone();
             }
+            Message::SelectedActionUseDefaultDelay(status) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    if status {
+                        action.delay = None;
+                        self.key_tab.action_option_controls.delay_text = "".to_string();
+                    } else {
+                        action.delay = Some(Duration::from_millis(self.settings_tab.config.default_delay as u64));
+                        self.key_tab.action_option_controls.delay_text = self.settings_tab.config.default_delay.to_string();
+                    }
+                    
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                        self.key_tab.editor.request_redraw();
+                }
+            }
+            Message::MacroActionDelayChangedText(text) => {
+                if let Ok(ms) = text.parse::<u32>() {
+                    self.key_tab.action_option_controls.delay_text = text;
+                    if let Some(action) = self.key_tab.selected_action.as_mut() {
+                        if let Some(delay) = action.delay.as_mut() {
+                            *delay = Duration::from_millis(ms as u64);
+                            
+                        }
+
+                        action.update_action(&self.key_tab.editor_actions.as_slice());
+                        self.key_tab.editor.request_redraw();
+                    }
+                } else if text == "" {
+                    self.settings_tab.press_time_text = text;
+                }
+            },
+            Message::MacroActionPickColor => {
+                self.key_tab.action_option_controls.show_color_picker = true;
+            }
+            Message::MacroActionCancelColor => {
+                self.key_tab.action_option_controls.show_color_picker = false;
+            }
+            Message::MacroActionSubmitColor(color) => {
+                let c = color.into_rgba8();
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::SetLed(color) => {
+                            *color = (c[0], c[1], c[2]);
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+                self.key_tab.action_option_controls.show_color_picker = false;
+            }
+            Message::MacroActionChooseKey(keyboard) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::KeyDown(key) => {
+                            *key = keyboard.into();
+                        },
+
+                        macro_editor::ActionOptions::KeyUp(key) => {
+                            *key = keyboard.into();
+                        },
+
+                        macro_editor::ActionOptions::KeyPress(key, _) => {
+                            *key = keyboard.into();
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            }
+            Message::MacroActionChooseConsumer(consumer) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::ConsumerPress(key, _) => {
+                            *key = consumer.into();
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            }
+            Message::SelectedActionSubUseDefaultDelay(status) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    let new_delay = if status {
+                        self.key_tab.action_option_controls.delay_text = "".to_string();
+                        None
+                    } else {
+                        self.key_tab.action_option_controls.delay_text = self.settings_tab.config.default_delay.to_string();
+                        Some(Duration::from_millis(self.settings_tab.config.default_delay as u64))
+                    };
+
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::KeyPress(_, delay) => {
+                            *delay = new_delay;
+                        },
+                        macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                            *delay = new_delay;
+                        },
+                        macro_editor::ActionOptions::String(_, delay) => {
+                            *delay = new_delay;
+                        },
+                        macro_editor::ActionOptions::Chord(_, delay) => {
+                            *delay = new_delay;
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            }
+            Message::MacroActionSubDelayChangedText(text) => {
+                if let Ok(ms) = text.parse::<u32>() {
+                    self.key_tab.action_option_controls.sub_delay_text = text;
+                    if let Some(action) = self.key_tab.selected_action.as_mut() {
+                        match &mut action.action_options {
+                            macro_editor::ActionOptions::KeyPress(_, delay) => {
+                                if let Some(delay) = delay.as_mut() {
+                                    *delay = Duration::from_millis(ms as u64);
+                                }
+                            },
+                            macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                                if let Some(delay) = delay.as_mut() {
+                                    *delay = Duration::from_millis(ms as u64);
+                                }
+                            },
+                            macro_editor::ActionOptions::String(_, delay) => {
+                                if let Some(delay) = delay.as_mut() {
+                                    *delay = Duration::from_millis(ms as u64);
+                                }
+                            },
+                            macro_editor::ActionOptions::Chord(_, delay) => {
+                                if let Some(delay) = delay.as_mut() {
+                                    *delay = Duration::from_millis(ms as u64);
+                                }
+                            },
+
+                            _ => unreachable!(),
+                        }
+
+                        action.update_action(&self.key_tab.editor_actions.as_slice());
+                        self.key_tab.editor.request_redraw();
+                    }
+                } else if text == "" {
+                    self.settings_tab.press_time_text = text;
+                }
+            },
+            Message::MacroActionStringChangedText(string) => todo!(),
+            Message::MacroActionChordChangedText(string) => todo!(),
+            Message::MacroActionLoopCountChangedText(count) => {
+                if let Ok(count) = count.parse::<u8>() {
+                    self.key_tab.action_option_controls.loop_count_text = count.to_string();
+                    if let Some(action) = self.key_tab.selected_action.as_mut() {
+                        match &mut action.action_options {
+                            macro_editor::ActionOptions::Loop(loop_count) => {
+                                *loop_count = count;
+
+                            },
+
+                            _ => unreachable!(),
+                        }
+
+                        action.update_action(&self.key_tab.editor_actions.as_slice());
+                        self.key_tab.editor.request_redraw();
+                    }
+                } else if count == "" {
+                    self.key_tab.action_option_controls.loop_count_text = count;
+                }
+            },
         };
 
         Command::none()
@@ -473,7 +642,7 @@ impl Application for Configurator {
                 .text_font(ROBOTO)
                 .text_size(20)
                 .into(),
-            State::Connected(_, Page::ModifyKey(i)) => {
+            State::Connected(_, Page::ModifyKey(i)) => {                
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
                     macropad_protocol::data_protocol::KeyMode::MacroMode => {
                         column![container(column![
@@ -675,8 +844,91 @@ impl Application for Configurator {
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
-                
                 let macro_size = macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()).size();
+                
+                let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
+                    let action_delay = container(column![
+                        text("Action Delay (ms)").font(ROBOTO).size(30),
+                                    Space::with_height(Length::Units(10)),
+                                    checkbox(
+                                        "Use Default Delay",
+                                        action.delay.is_none(),
+                                        Message::SelectedActionUseDefaultDelay
+                                    ),
+                                    Space::with_height(Length::Units(10)),
+                                    text_input(
+                                        (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                        self.key_tab.action_option_controls.delay_text.as_str(),
+                                        Message::DefaultDelayChangedText
+                                    ).font(ROBOTO),
+                    ]);
+
+                    match &action.action_options {
+                        macro_editor::ActionOptions::Empty => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::SetLed(_) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::ClearLed => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::KeyDown(_) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::KeyUp(_) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::KeyPress(_, _) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::ConsumerPress(_, _) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::String(_, _) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::Chord(_, _) => {
+                            column![
+                                action_delay,
+                            ]
+                        },
+                        macro_editor::ActionOptions::Loop(count) => {
+                            column![
+                                action_delay,
+                                Space::with_height(Length::Units(20)),
+
+                                text("Loop Count").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    count.to_string().as_str(),
+                                    self.key_tab.action_option_controls.loop_count_text.as_str(),
+                                    Message::MacroActionLoopCountChangedText
+                                ).font(ROBOTO),
+                            ]
+                        },
+                    }
+                } else {
+                    column![
+                        text("Nothing selected").font(ROBOTO).size(30),
+                    ]
+                };
 
                 let macro_controls = container(column![
                     row![
@@ -691,7 +943,13 @@ impl Application for Configurator {
                             }),
                     ],
 
-
+                    container(action_settings)
+                        .width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(Padding {
+                            top: 20,
+                            right: 0,
+                            bottom: 20,
+                            left: 0,
+                        }),
 
                     container(row![
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
@@ -790,6 +1048,29 @@ trait Tab {
 }
 
 #[derive(Debug)]
+pub struct actionOptionControls {
+    pub delay_text: String,
+    pub show_color_picker: bool,
+    pub sub_delay_text: String,
+    pub string_text: String,
+    pub chord_text: String,
+    pub loop_count_text: String,
+}
+
+impl Default for actionOptionControls {
+    fn default() -> Self {
+        Self {
+            delay_text: String::new(),
+            show_color_picker: false,
+            sub_delay_text: String::new(),
+            string_text: String::new(),
+            chord_text: String::new(),
+            loop_count_text: String::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct KeyTab {
     selected_key: Option<usize>,
     clicked: bool,
@@ -797,6 +1078,8 @@ struct KeyTab {
     key_configs: Vec<macro_parser::KeyConfig>,
     editor: macro_editor::State,
     editor_actions: Vec<Action>,
+    action_option_controls: actionOptionControls,
+    selected_action: Option<macro_editor::SelectedAction>,
     actions: HashMap<
         macropad_protocol::data_protocol::KeyConfigElements,
         (bool, Instant, hid_manager::MacropadCommand),
@@ -813,8 +1096,52 @@ impl KeyTab {
             key_configs: macropad.key_configs.clone(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
+            action_option_controls: actionOptionControls::default(),
+            selected_action: None,
             actions: HashMap::new(),
         }
+    }
+
+    fn select(&mut self, select: Option<SelectedAction>) {
+        self.action_option_controls = actionOptionControls::default();
+        
+        if let Some(select) = select.as_ref() {
+            match &select.action_options {
+                macro_editor::ActionOptions::Empty => {},
+                macro_editor::ActionOptions::SetLed(_) => {},
+                macro_editor::ActionOptions::ClearLed => {},
+                macro_editor::ActionOptions::KeyDown(_) => {},
+                macro_editor::ActionOptions::KeyUp(_) => {},
+                macro_editor::ActionOptions::KeyPress(_, delay) => {
+                    if let Some(delay) = delay {
+                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
+                    }
+                },
+                macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                    if let Some(delay) = delay {
+                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
+                    }
+                },
+                macro_editor::ActionOptions::String(string, delay) => {
+                    self.action_option_controls.string_text = string.clone();
+                    if let Some(delay) = delay {
+                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
+                    }
+                },
+                macro_editor::ActionOptions::Chord(string, delay) => {
+                    todo!()
+                },
+                macro_editor::ActionOptions::Loop(count) => {
+                    self.action_option_controls.loop_count_text = count.to_string();
+                },
+            }
+
+            if let Some(delay) = select.delay {
+                self.action_option_controls.delay_text = delay.as_millis().to_string();
+            }
+        }
+
+        self.selected_action = select;
     }
 
     fn update_config(&mut self, macropad: Arc<Mutex<macro_parser::Macropad>>) {
@@ -892,6 +1219,8 @@ impl Default for KeyTab {
             key_configs: Vec::new(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
+            action_option_controls: actionOptionControls::default(),
+            selected_action: None,
             actions: HashMap::new(),
         }
     }
@@ -1320,13 +1649,15 @@ impl Tab for SettingsTab {
                 }),
                 container(column![
                     text("Default Delay (ms)").font(ROBOTO).size(30),
-                    text_input(
-                        (self.config.default_delay / 1000).to_string().as_str(),
-                        self.default_delay_text.as_str(),
-                        Message::DefaultDelayChangedText
-                    )
-                    .font(ROBOTO)
-                    .width(Length::Units(50)),
+                    row![
+                        text_input(
+                            (self.config.default_delay / 1000).to_string().as_str(),
+                            self.default_delay_text.as_str(),
+                            Message::DefaultDelayChangedText
+                        )
+                        .font(ROBOTO)
+                        .width(Length::Units(50)),
+                    ]
                 ])
                 .padding(Padding {
                     top: 20,
