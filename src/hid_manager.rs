@@ -96,10 +96,12 @@ pub fn connect() -> Subscription<Event> {
                                     },
                                     MacropadCommand::Macro(i, macro_data) => {
                                         macro_data.pack().and_then(|data| {
-                                            macropad_wrapper::set_macro(&device, i, &data).and_then(|_| {
-                                                macropad_wrapper::validate_macro(&device, i, &data).and_then(|_| {
-                                                    macropad.lock().unwrap().set_macro(i as usize, macro_data);
-                                                    Ok(())
+                                            macropad_wrapper::clear_macro(&device, i).and_then(|_| {
+                                                macropad_wrapper::set_macro(&device, i, &data).and_then(|_| {
+                                                    macropad_wrapper::validate_macro(&device, i, &data).and_then(|_| {
+                                                        macropad.lock().unwrap().set_macro(i as usize, macro_data);
+                                                        Ok(())
+                                                    })
                                                 })
                                             })
                                         })

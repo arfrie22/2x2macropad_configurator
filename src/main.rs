@@ -16,7 +16,7 @@ use iced_native::widget::space;
 use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_editor::Action;
+use macropad_configurator::macro_editor::{Action, MacroAction};
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
 use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper};
 use macropad_configurator::{
@@ -675,23 +675,52 @@ impl Application for Configurator {
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
+                
                 let macro_size = macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()).size();
+
+                let macro_controls = container(column![
+                    row![
+                        text("Macro Size:").font(ROBOTO).size(30),
+                        Space::with_width(Length::Units(10)),
+                        Badge::new(Text::new(format!("{}/4092", macro_size))).style(if macro_size > 4092 {
+                                BadgeStyles::Danger
+                            } else if macro_size > 4000 {
+                                BadgeStyles::Warning
+                            } else {
+                                BadgeStyles::Success
+                            }),
+                    ],
+
+                    container(row![
+                        container(button("Cancel").on_press(Message::ButtonPressed(*i))),
+                        Space::with_width(Length::Units(20)),
+                        button("Save").on_press(Message::SaveMacro),
+                        ]).height(Length::Fill).align_y(alignment::Vertical::Bottom)
+                ]).width(Length::Units(300)).height(Length::Fill).padding(Padding {
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    left: 20,
+                });
+
                 let message = column![
-                    text(format!("Edit {:?} Macro {:?}", macro_type, i))
+                    text(format!("Edit the {} macro for key {}", match macro_type {
+                        macro_parser::MacroType::Tap => "single tap",
+                        macro_parser::MacroType::Hold => "hold",
+                        macro_parser::MacroType::DoubleTap => "double tap",
+                        macro_parser::MacroType::TapHold => "tap and hold",
+                    }, i))
                         .font(ROBOTO)
                         .size(60),
                     button("Back").on_press(Message::ButtonPressed(*i)),
-                    self.key_tab
-                        .editor
-                        .view(&self.key_tab.editor_actions.as_slice())
-                        .map(Message::EditorMessage),
-                    Badge::new(Text::new(format!("{}/4092", macro_size))).style(if macro_size > 4092 {
-                            BadgeStyles::Danger
-                        } else if macro_size > 4000 {
-                            BadgeStyles::Warning
-                        } else {
-                            BadgeStyles::Success
-                        }),
+                    row![
+                        self.key_tab
+                            .editor
+                            .view(&self.key_tab.editor_actions.as_slice())
+                            .map(Message::EditorMessage),
+                        
+                        macro_controls,
+                    ],
                 ];
                 
                 container(message)
@@ -699,7 +728,7 @@ impl Application for Configurator {
                     .height(Length::Fill)
                     .center_x()
                     .center_y()
-                    .padding(100)
+                    .padding(10)
                     .into()
             }
         }
