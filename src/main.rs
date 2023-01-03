@@ -413,7 +413,7 @@ impl Application for Configurator {
                         action.delay = None;
                         self.key_tab.action_option_controls.delay_text = "".to_string();
                     } else {
-                        action.delay = Some(Duration::from_millis(self.settings_tab.config.default_delay as u64));
+                        action.delay = Some(Duration::from_micros(self.settings_tab.config.default_delay as u64));
                         self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
                     }
                     
@@ -502,7 +502,7 @@ impl Application for Configurator {
                         None
                     } else {
                         self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
-                        Some(Duration::from_millis(self.settings_tab.config.default_delay as u64))
+                        Some(Duration::from_micros(self.settings_tab.config.default_delay as u64))
                     };
 
                     match &mut action.action_options {
@@ -1022,6 +1022,7 @@ impl Application for Configurator {
                             ]
                         },
                         macro_editor::ActionOptions::Chord(keys, delay) => {
+                            // TODO: Chord should have check boxes to choose ctrl + shift + alt + GUI, also same as string \n and \t should be repalced by a down and right arrow respectively
                             column![
                                 action_delay,
 

@@ -272,9 +272,7 @@ impl SelectedAction {
             ActionWrapper::KeyDown(key) => ActionOptions::KeyDown(key),
             ActionWrapper::KeyUp(key) => ActionOptions::KeyUp(key),
             ActionWrapper::KeyPress(key, delay) => ActionOptions::KeyPress(key, delay),
-            ActionWrapper::ConsumerPress(key, delay) => {
-                ActionOptions::ConsumerPress(key, delay)
-            }
+            ActionWrapper::ConsumerPress(key, delay) => ActionOptions::ConsumerPress(key, delay),
             ActionWrapper::String(string, delay) => ActionOptions::String(string, delay),
             ActionWrapper::Chord(keys, delay) => ActionOptions::Chord(keys, delay),
             ActionWrapper::Loop(_, count) => ActionOptions::Loop(count),
@@ -306,70 +304,70 @@ impl SelectedAction {
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::SetLed(color) => {
                 if let ActionWrapper::SetLed(_) = action.get_action() {
                     action.set_action(ActionWrapper::SetLed(*color));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::ClearLed => {
                 if let ActionWrapper::ClearLed = action.get_action() {
                     action.set_action(ActionWrapper::ClearLed);
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::KeyDown(key) => {
                 if let ActionWrapper::KeyDown(_) = action.get_action() {
                     action.set_action(ActionWrapper::KeyDown(*key));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::KeyUp(key) => {
                 if let ActionWrapper::KeyUp(_) = action.get_action() {
                     action.set_action(ActionWrapper::KeyUp(*key));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::KeyPress(key, delay) => {
                 if let ActionWrapper::KeyPress(_, _) = action.get_action() {
                     action.set_action(ActionWrapper::KeyPress(*key, *delay));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::ConsumerPress(key, delay) => {
                 if let ActionWrapper::ConsumerPress(_, _) = action.get_action() {
                     action.set_action(ActionWrapper::ConsumerPress(*key, *delay));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::String(string, delay) => {
                 if let ActionWrapper::String(_, _) = action.get_action() {
                     action.set_action(ActionWrapper::String(string.clone(), *delay));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::Chord(keys, delay) => {
                 if let ActionWrapper::Chord(_, _) = action.get_action() {
                     action.set_action(ActionWrapper::Chord(keys.clone(), *delay));
                 } else {
                     unreachable!()
                 }
-            },
+            }
             ActionOptions::Loop(count) => {
                 if let ActionWrapper::Loop(actions, _) = action.get_action() {
                     action.set_action(ActionWrapper::Loop(actions.clone(), *count));
                 } else {
                     unreachable!()
                 }
-            },
+            }
         }
 
         action.set_delay(self.delay);
@@ -630,11 +628,10 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                         }
                     }
                     mouse::Event::ButtonReleased(mouse::Button::Left) => match state.0.take() {
-                        Some(Drag {
-                            action, moved, ..
-                        }) => {
+                        Some(Drag { action, moved, .. }) => {
                             if !moved {
-                                let selected = Some(SelectedAction::from_action(&action, self.actions));
+                                let selected =
+                                    Some(SelectedAction::from_action(&action, self.actions));
                                 *state = (None, Some(action));
                                 return (
                                     event::Status::Captured,
@@ -1263,7 +1260,6 @@ impl Action {
         });
     }
 
-
     fn draw_arguments(
         &self,
         frame: &mut Frame,
@@ -1274,8 +1270,20 @@ impl Action {
     ) {
         for argument in arguments.args {
             frame.fill_rectangle(
-                position + Vector::new(argument.offset, (ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0),
-                Size::new(argument.width, ARGUMENT_SIZE),
+                position
+                    + if let ArgumentType::Boolean(_, _) = &argument.arg_type {
+                        Vector::new(argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0, ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0) + (ARGUMENT_SIZE / 2.0))
+                    } else {
+                        Vector::new(argument.offset, (ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0)
+                    },
+                Size::new(
+                    if let ArgumentType::Boolean(_, _) = &argument.arg_type {
+                        ARGUMENT_SIZE
+                    } else {
+                        argument.width
+                    },
+                    ARGUMENT_SIZE,
+                ),
                 if selected {
                     theme.extended_palette().primary.strong.color
                 } else {
@@ -1305,16 +1313,46 @@ impl Action {
                     Size::new(argument.width - 5.0, ARGUMENT_SIZE - 5.0),
                     color,
                 );
+            } else if let ArgumentType::Boolean(boolean, content) = argument.arg_type {
+                frame.fill_rectangle(
+                    position
+                        + Vector::new((argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0) + 2.5, ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0) + (ARGUMENT_SIZE / 2.0) + 2.5),
+                    Size::new(ARGUMENT_SIZE - 5.0, ARGUMENT_SIZE - 5.0),
+                    if boolean {
+                        theme.palette().success
+                    } else {
+                        theme.palette().danger
+                    },
+                );
+
+                frame.fill_text(canvas::Text {
+                    content,
+                    position: position
+                        + Vector::new(
+                            argument.offset + 2.5 + (argument.width / 2.0),
+                            (ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0,
+                        ),
+                    color: theme.palette().text,
+                    size: ARGUMENT_SIZE,
+                    font: ROBOTO,
+                    horizontal_alignment: iced::alignment::Horizontal::Center,
+                    vertical_alignment: iced::alignment::Vertical::Center,
+                });
             } else {
                 let content = match argument.arg_type {
                     ArgumentType::String(string) => string,
                     ArgumentType::Number(num) => num.to_string(),
                     ArgumentType::Color(_) => unreachable!(),
+                    ArgumentType::Boolean(_, _) => unreachable!(),
                 };
 
                 frame.fill_text(canvas::Text {
                     content,
-                    position: position + Vector::new(argument.offset + 2.5 + (argument.width / 2.0), ACTION_SIZE.height / 2.0),
+                    position: position
+                        + Vector::new(
+                            argument.offset + 2.5 + (argument.width / 2.0),
+                            ACTION_SIZE.height / 2.0,
+                        ),
                     color: theme.palette().text,
                     size: ARGUMENT_SIZE,
                     font: ROBOTO,
@@ -1326,7 +1364,11 @@ impl Action {
             if let Some(content) = argument.post_text {
                 frame.fill_text(canvas::Text {
                     content,
-                    position: position + Vector::new(argument.offset + argument.width + 2.5, ACTION_SIZE.height / 2.0),
+                    position: position
+                        + Vector::new(
+                            argument.offset + argument.width + 2.5,
+                            ACTION_SIZE.height / 2.0,
+                        ),
                     color: theme.palette().text,
                     size: ARGUMENT_SIZE,
                     font: ROBOTO,
@@ -1380,7 +1422,7 @@ impl Action {
                     selected_bool,
                     Arguments::after_title("Set LED Color".to_string())
                         .with_color(Color::from_rgb8(r, g, b)),
-                ); 
+                );
             }
             ActionWrapper::ClearLed => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1398,9 +1440,8 @@ impl Action {
                     theme,
                     position,
                     selected_bool,
-                    Arguments::after_title("Hold Key".to_string())
-                        .with_key(key),
-                ); 
+                    Arguments::after_title("Hold Key".to_string()).with_key(key),
+                );
             }
             ActionWrapper::KeyUp(key) => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1412,9 +1453,8 @@ impl Action {
                     theme,
                     position,
                     selected_bool,
-                    Arguments::after_title("Release Key".to_string())
-                        .with_key(key),
-                ); 
+                    Arguments::after_title("Release Key".to_string()).with_key(key),
+                );
             }
             ActionWrapper::KeyPress(key, delay) => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1429,7 +1469,7 @@ impl Action {
                     Arguments::after_title("Press Key".to_string())
                         .with_key(key)
                         .with_delay(delay),
-                ); 
+                );
             }
             ActionWrapper::ConsumerPress(key, delay) => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1444,7 +1484,7 @@ impl Action {
                     Arguments::after_title("Press Consumer Key".to_string())
                         .with_consumer(key)
                         .with_delay(delay),
-                ); 
+                );
             }
             ActionWrapper::String(string, delay) => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1474,7 +1514,7 @@ impl Action {
                     Arguments::after_title("Chord".to_string())
                         .with_chord(keys)
                         .with_delay(delay),
-                ); 
+                );
             }
             ActionWrapper::Loop(actions, loop_count) => {
                 self.draw_base(frame, theme, position, selected_bool);
@@ -1487,7 +1527,7 @@ impl Action {
                     selected_bool,
                     Arguments::after_title("Begin Loop".to_string())
                         .with_labeled_number("Loop Count:", loop_count as f32),
-                ); 
+                );
 
                 let mut index = 1;
                 for action in actions {
@@ -1595,6 +1635,7 @@ enum ArgumentType {
     String(String),
     Number(f32),
     Color(Color),
+    Boolean(bool, String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1715,6 +1756,7 @@ impl Arguments {
             content
         };
 
+        // TODO: Replace \n and \t with down and right arrow respectively
         self.args.push(Argument {
             arg_type: ArgumentType::String(content),
             width: 100.0,
@@ -1730,23 +1772,28 @@ impl Arguments {
 
     pub fn with_chord(mut self, keys: Vec<usbd_human_interface_device::page::Keyboard>) -> Self {
         let content = KeyboardWrapper::get_chord_string(&keys);
-        let content = if content.len() > 15 {
-            format!("{}...", &content[0..12])
+        let content = if content.len() > 7 {
+            format!("{}...", &content[0..4])
         } else {
             content
         };
 
+        // Should have booleans for Ctrl, Alt, Shift, and GUI (need new argument type) (should be success if true and danger if false) (should be square box like color argument type)
+        // TODO: Replace \n and \t with down and right arrow respectively
         self.args.push(Argument {
             arg_type: ArgumentType::String(content),
-            width: 100.0,
+            width: 50.0,
             pre_text: Some((self.offset, "Chord:".to_string())),
             offset: self.offset + Arguments::offset_from_text("Chord:".to_string()),
             post_text: None,
         });
 
-        self.offset += 100.0 + Arguments::offset_from_text("Chord:".to_string()) + TITLE_OFFSET.x;
+        self.offset += 50.0 + Arguments::offset_from_text("Chord:".to_string()) + TITLE_OFFSET.x;
 
-        self
+        self.with_labeled_boolean("CTRL", true)
+            .with_labeled_boolean("SHIFT", false)
+            .with_labeled_boolean("ALT", true)
+            .with_labeled_boolean("GUI", true)
     }
 
     pub fn with_labeled_number(mut self, label: &str, number: f32) -> Self {
@@ -1759,6 +1806,20 @@ impl Arguments {
         });
 
         self.offset += 40.0 + Arguments::offset_from_text(label.to_owned()) + TITLE_OFFSET.x;
+
+        self
+    }
+
+    pub fn with_labeled_boolean(mut self, label: &str, boolean: bool) -> Self {
+        self.args.push(Argument {
+            arg_type: ArgumentType::Boolean(boolean, label.to_owned()),
+            width: Arguments::offset_from_text(label.to_owned()),
+            pre_text: None,
+            offset: self.offset,
+            post_text: None,
+        });
+
+        self.offset += Arguments::offset_from_text(label.to_owned()).max(ARGUMENT_SIZE) + TITLE_OFFSET.x;
 
         self
     }
