@@ -87,17 +87,21 @@ pub enum Message {
     HoldTimeChangedText(String),
     DefaultDelayChangedText(String),
     SwitchTheme,
-    SelectedActionUseDefaultDelay(bool),
+    MacroActionUseDefaultDelay(bool),
     MacroActionDelayChangedText(String),
     MacroActionPickColor,
     MacroActionCancelColor,
     MacroActionSubmitColor(Color),
     MacroActionChooseKey(KeyboardWrapper),
     MacroActionChooseConsumer(ConsumerWrapper),
-    SelectedActionSubUseDefaultDelay(bool),
+    MacroActionSubUseDefaultDelay(bool),
     MacroActionSubDelayChangedText(String),
     MacroActionStringChangedText(String),
     MacroActionChordChangedText(String),
+    MacroActionChordCtrl(bool),
+    MacroActionChordShift(bool),
+    MacroActionChordAlt(bool),
+    MacroActionChordGui(bool),
     MacroActionLoopCountChangedText(String),
 }
 
@@ -407,7 +411,7 @@ impl Application for Configurator {
                 };
                 self.settings_tab.theme = self.theme.clone();
             }
-            Message::SelectedActionUseDefaultDelay(status) => {
+            Message::MacroActionUseDefaultDelay(status) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     if status {
                         action.delay = None;
@@ -495,13 +499,13 @@ impl Application for Configurator {
                     self.key_tab.editor.request_redraw();
                 }
             }
-            Message::SelectedActionSubUseDefaultDelay(status) => {
+            Message::MacroActionSubUseDefaultDelay(status) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     let new_delay = if status {
-                        self.key_tab.action_option_controls.delay_text = "".to_string();
+                        self.key_tab.action_option_controls.sub_delay_text = "".to_string();
                         None
                     } else {
-                        self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
+                        self.key_tab.action_option_controls.sub_delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
                         Some(Duration::from_micros(self.settings_tab.config.default_delay as u64))
                     };
 
@@ -567,6 +571,62 @@ impl Application for Configurator {
             },
             Message::MacroActionStringChangedText(string) => todo!(),
             Message::MacroActionChordChangedText(string) => todo!(),
+            Message::MacroActionChordCtrl(value) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::Chord(chord, _) => {
+                            chord.ctrl = value;
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            },
+            Message::MacroActionChordShift(value) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::Chord(chord, _) => {
+                            chord.shift = value;
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            },
+            Message::MacroActionChordAlt(value) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::Chord(chord, _) => {
+                            chord.alt = value;
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            },
+            Message::MacroActionChordGui(value) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::Chord(chord, _) => {
+                            chord.gui = value;
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            },
             Message::MacroActionLoopCountChangedText(count) => {
                 if let Ok(count) = count.parse::<u8>() {
                     self.key_tab.action_option_controls.loop_count_text = count.to_string();
@@ -856,7 +916,7 @@ impl Application for Configurator {
                         checkbox(
                             "Use Default Delay",
                             action.delay.is_none(),
-                            Message::SelectedActionUseDefaultDelay
+                            Message::MacroActionUseDefaultDelay
                         ),
                         Space::with_height(Length::Units(10)),
                         text_input(
@@ -949,7 +1009,7 @@ impl Application for Configurator {
                                 checkbox(
                                     "Use Default Delay",
                                     delay.is_none(),
-                                    Message::SelectedActionSubUseDefaultDelay
+                                    Message::MacroActionSubUseDefaultDelay
                                 ),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -980,7 +1040,7 @@ impl Application for Configurator {
                                 checkbox(
                                     "Use Default Delay",
                                     delay.is_none(),
-                                    Message::SelectedActionSubUseDefaultDelay
+                                    Message::MacroActionSubUseDefaultDelay
                                 ),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1011,7 +1071,7 @@ impl Application for Configurator {
                                 checkbox(
                                     "Use Default Delay",
                                     delay.is_none(),
-                                    Message::SelectedActionSubUseDefaultDelay
+                                    Message::MacroActionSubUseDefaultDelay
                                 ),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1021,7 +1081,7 @@ impl Application for Configurator {
                                 ).font(ROBOTO),
                             ]
                         },
-                        macro_editor::ActionOptions::Chord(keys, delay) => {
+                        macro_editor::ActionOptions::Chord(chord, delay) => {
                             // TODO: Chord should have check boxes to choose ctrl + shift + alt + GUI, also same as string \n and \t should be repalced by a down and right arrow respectively
                             column![
                                 action_delay,
@@ -1030,11 +1090,36 @@ impl Application for Configurator {
 
                                 text("Keys").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
-                                // text_input(
-                                //     string.as_str(),
-                                //     self.key_tab.action_option_controls.string_text.as_str(),
-                                //     Message::MacroActionStringChangedText
-                                // ).font(ROBOTO),
+                                text_input(
+                                    chord.string.as_str(),
+                                    self.key_tab.action_option_controls.chord_text.as_str(),
+                                    Message::MacroActionChordChangedText
+                                ).font(ROBOTO),
+
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Ctrl",
+                                    chord.ctrl,
+                                    Message::MacroActionChordCtrl
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Shift",
+                                    chord.shift,
+                                    Message::MacroActionChordShift
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Alt",
+                                    chord.alt,
+                                    Message::MacroActionChordAlt
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "GUI",
+                                    chord.gui,
+                                    Message::MacroActionChordGui
+                                ),
 
                                 Space::with_height(Length::Units(20)),
 
@@ -1043,7 +1128,7 @@ impl Application for Configurator {
                                 checkbox(
                                     "Use Default Delay",
                                     delay.is_none(),
-                                    Message::SelectedActionSubUseDefaultDelay
+                                    Message::MacroActionSubUseDefaultDelay
                                 ),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1100,8 +1185,8 @@ impl Application for Configurator {
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
                         Space::with_width(Length::Units(40)),
                         button("Save").on_press(Message::SaveMacro),
-                        ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom)
-                ]).width(Length::Units(300)).height(Length::Fill).padding(Padding {
+                        ]).width(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom)
+                ]).width(Length::Units(300)).padding(Padding {
                     top: 0,
                     right: 0,
                     bottom: 0,
@@ -1273,8 +1358,11 @@ impl KeyTab {
                         self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                     }
                 },
-                macro_editor::ActionOptions::Chord(string, delay) => {
-                    todo!()
+                macro_editor::ActionOptions::Chord(chord, delay) => {
+                    self.action_option_controls.chord_text = chord.string.clone();
+                    if let Some(delay) = delay {
+                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
+                    }
                 },
                 macro_editor::ActionOptions::Loop(count) => {
                     self.action_option_controls.loop_count_text = count.to_string();

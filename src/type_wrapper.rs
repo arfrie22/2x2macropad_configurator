@@ -1002,3 +1002,441 @@ impl From<ConsumerWrapper> for Consumer {
         wrapper.0
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Chord {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub gui: bool,
+
+    pub string: String,
+}
+
+impl Chord {
+}
+
+impl From<Vec<KeyboardWrapper>> for Chord {
+    fn from(keys: Vec<KeyboardWrapper>) -> Chord {
+        keys.into_iter().map(KeyboardWrapper::from).collect::<Vec<KeyboardWrapper>>().into()
+        
+    }
+}
+
+impl From<Chord> for Vec<Keyboard> {
+    fn from(chord: Chord) -> Self {
+        let mut keys = Vec::new();
+        if chord.ctrl {
+            keys.push(Keyboard::LeftControl);
+        }
+        if chord.alt {
+            keys.push(Keyboard::LeftAlt);
+        }
+        if chord.shift {
+            keys.push(Keyboard::LeftShift);
+        }
+        if chord.gui {
+            keys.push(Keyboard::LeftGUI);
+        }
+
+        for key in chord.string.chars() {
+            match key {
+                'A' => keys.push(Keyboard::A),
+                'B' => keys.push(Keyboard::B),
+                'C' => keys.push(Keyboard::C),
+                'D' => keys.push(Keyboard::D),
+                'E' => keys.push(Keyboard::E),
+                'F' => keys.push(Keyboard::F),
+                'G' => keys.push(Keyboard::G),
+                'H' => keys.push(Keyboard::H),
+                'I' => keys.push(Keyboard::I),
+                'J' => keys.push(Keyboard::J),
+                'K' => keys.push(Keyboard::K),
+                'L' => keys.push(Keyboard::L),
+                'M' => keys.push(Keyboard::M),
+                'N' => keys.push(Keyboard::N),
+                'O' => keys.push(Keyboard::O),
+                'P' => keys.push(Keyboard::P),
+                'Q' => keys.push(Keyboard::Q),
+                'R' => keys.push(Keyboard::R),
+                'S' => keys.push(Keyboard::S),
+                'T' => keys.push(Keyboard::T),
+                'U' => keys.push(Keyboard::U),
+                'V' => keys.push(Keyboard::V),
+                'W' => keys.push(Keyboard::W),
+                'X' => keys.push(Keyboard::X),
+                'Y' => keys.push(Keyboard::Y),
+                'Z' => keys.push(Keyboard::Z),
+                '1' => keys.push(Keyboard::Keyboard1),
+                '2' => keys.push(Keyboard::Keyboard2),
+                '3' => keys.push(Keyboard::Keyboard3),
+                '4' => keys.push(Keyboard::Keyboard4),
+                '5' => keys.push(Keyboard::Keyboard5),
+                '6' => keys.push(Keyboard::Keyboard6),
+                '7' => keys.push(Keyboard::Keyboard7),
+                '8' => keys.push(Keyboard::Keyboard8),
+                '9' => keys.push(Keyboard::Keyboard9),
+                '0' => keys.push(Keyboard::Keyboard0),
+                '⏎' => keys.push(Keyboard::ReturnEnter),
+                '⎋' => keys.push(Keyboard::Escape),
+                '⇥' => keys.push(Keyboard::Tab),
+                ' ' => keys.push(Keyboard::Space),
+                '-' => keys.push(Keyboard::Minus),
+                '=' => keys.push(Keyboard::Equal),
+                '[' => keys.push(Keyboard::LeftBrace),
+                ']' => keys.push(Keyboard::RightBrace),
+                '\\' => keys.push(Keyboard::Backslash),
+                '#' => keys.push(Keyboard::NonUSHash),
+                ';' => keys.push(Keyboard::Semicolon),
+                '\'' => keys.push(Keyboard::Apostrophe),
+                '`' => keys.push(Keyboard::Grave),
+                ',' => keys.push(Keyboard::Comma),
+                '.' => keys.push(Keyboard::Dot),
+                '/' => keys.push(Keyboard::ForwardSlash),
+                '→' => keys.push(Keyboard::RightArrow),
+                '←' => keys.push(Keyboard::LeftArrow),
+                '↓' => keys.push(Keyboard::DownArrow),
+                '↑' => keys.push(Keyboard::UpArrow),
+
+                _ => unimplemented!(),
+            }
+        }
+
+        keys
+    }
+}
+
+impl From<Chord> for Vec<KeyboardWrapper> {
+    fn from(chord: Chord) -> Self {
+        <Vec<Keyboard>>::from(chord).into_iter().map(KeyboardWrapper::from).collect::<Vec<KeyboardWrapper>>()
+    }
+}
+
+impl From<Vec<Keyboard>> for Chord {
+    fn from(keys: Vec<Keyboard>) -> Chord {
+        let mut ctrl = false;
+        let mut alt = false;
+        let mut shift = false;
+        let mut gui = false;
+        let mut string = String::new();
+
+        for key in keys {
+            match key {
+                Keyboard::A => {
+                    if !string.contains("A") {
+                        string.push('A');
+                    }
+                },
+                Keyboard::B => {
+                    if !string.contains("B") {
+                        string.push('B');
+                    }
+                },
+                Keyboard::C => {
+                    if !string.contains("C") {
+                        string.push('C');
+                    }
+                },
+                Keyboard::D => {
+                    if !string.contains("D") {
+                        string.push('D');
+                    }
+                },
+                Keyboard::E => {
+                    if !string.contains("E") {
+                        string.push('E');
+                    }
+                },
+                Keyboard::F => {
+                    if !string.contains("F") {
+                        string.push('F');
+                    }
+                },
+                Keyboard::G => {
+                    if !string.contains("G") {
+                        string.push('G');
+                    }
+                },
+                Keyboard::H => {
+                    if !string.contains("H") {
+                        string.push('H');
+                    }
+                },
+                Keyboard::I => {
+                    if !string.contains("I") {
+                        string.push('I');
+                    }
+                },
+                Keyboard::J => {
+                    if !string.contains("J") {
+                        string.push('J');
+                    }
+                },
+                Keyboard::K => {
+                    if !string.contains("K") {
+                        string.push('K');
+                    }
+                },
+                Keyboard::L => {
+                    if !string.contains("L") {
+                        string.push('L');
+                    }
+                },
+                Keyboard::M => {
+                    if !string.contains("M") {
+                        string.push('M');
+                    }
+                },
+                Keyboard::N => {
+                    if !string.contains("N") {
+                        string.push('N');
+                    }
+                },
+                Keyboard::O => {
+                    if !string.contains("O") {
+                        string.push('O');
+                    }
+                },
+                Keyboard::P => {
+                    if !string.contains("P") {
+                        string.push('P');
+                    }
+                },
+                Keyboard::Q => {
+                    if !string.contains("Q") {
+                        string.push('Q');
+                    }
+                },
+                Keyboard::R => {
+                    if !string.contains("R") {
+                        string.push('R');
+                    }
+                },
+                Keyboard::S => {
+                    if !string.contains("S") {
+                        string.push('S');
+                    }
+                },
+                Keyboard::T => {
+                    if !string.contains("T") {
+                        string.push('T');
+                    }
+                },
+                Keyboard::U => {
+                    if !string.contains("U") {
+                        string.push('U');
+                    }
+                },
+                Keyboard::V => {
+                    if !string.contains("V") {
+                        string.push('V');
+                    }
+                },
+                Keyboard::W => {
+                    if !string.contains("W") {
+                        string.push('W');
+                    }
+                },
+                Keyboard::X => {
+                    if !string.contains("X") {
+                        string.push('X');
+                    }
+                },
+                Keyboard::Y => {
+                    if !string.contains("Y") {
+                        string.push('Y');
+                    }
+                },
+                Keyboard::Z => {
+                    if !string.contains("Z") {
+                        string.push('Z');
+                    }
+                },
+                Keyboard::Keyboard1 => {
+                    if !string.contains("1") {
+                        string.push('1');
+                    }
+                },
+                Keyboard::Keyboard2 => {
+                    if !string.contains("2") {
+                        string.push('2');
+                    }
+                },
+                Keyboard::Keyboard3 => {
+                    if !string.contains("3") {
+                        string.push('3');
+                    }
+                },
+                Keyboard::Keyboard4 => {
+                    if !string.contains("4") {
+                        string.push('4');
+                    }
+                },
+                Keyboard::Keyboard5 => {
+                    if !string.contains("5") {
+                        string.push('5');
+                    }
+                },
+                Keyboard::Keyboard6 => {
+                    if !string.contains("6") {
+                        string.push('6');
+                    }
+                },
+                Keyboard::Keyboard7 => {
+                    if !string.contains("7") {
+                        string.push('7');
+                    }
+                },
+                Keyboard::Keyboard8 => {
+                    if !string.contains("8") {
+                        string.push('8');
+                    }
+                },
+                Keyboard::Keyboard9 => {
+                    if !string.contains("9") {
+                        string.push('9');
+                    }
+                },
+                Keyboard::Keyboard0 => {
+                    if !string.contains("0") {
+                        string.push('0');
+                    }
+                },
+                Keyboard::ReturnEnter => {
+                    if !string.contains("⏎") {
+                        string.push('⏎');
+                    }
+                },
+                Keyboard::Escape => {
+                    if !string.contains("⎋") {
+                        string.push('⎋');
+                    }
+                },
+                Keyboard::Tab => {
+                    if !string.contains("⇥") {
+                        string.push('⇥');
+                    }
+                },
+                Keyboard::Space => {
+                    if !string.contains(" ") {
+                        string.push(' ');
+                    }
+                },
+                Keyboard::Minus => {
+                    if !string.contains("-") {
+                        string.push('-');
+                    }
+                },
+                Keyboard::Equal => {
+                    if !string.contains("=") {
+                        string.push('=');
+                    }
+                },
+                Keyboard::LeftBrace => {
+                    if !string.contains("[") {
+                        string.push('[');
+                    }
+                },
+                Keyboard::RightBrace => {
+                    if !string.contains("]") {
+                        string.push(']');
+                    }
+                },
+                Keyboard::Backslash => {
+                    if !string.contains("\\") {
+                        string.push('\\');
+                    }
+                },
+                Keyboard::NonUSHash => {
+                    if !string.contains("#") {
+                        string.push('#');
+                    }
+                },
+                Keyboard::Semicolon => {
+                    if !string.contains(";") {
+                        string.push(';');
+                    }
+                },
+                Keyboard::Apostrophe => {
+                    if !string.contains("'") {
+                        string.push('\'');
+                    }
+                },
+                Keyboard::Grave => {
+                    if !string.contains("`") {
+                        string.push('`');
+                    }
+                },
+                Keyboard::Comma => {
+                    if !string.contains(",") {
+                        string.push(',');
+                    }
+                },
+                Keyboard::Dot => {
+                    if !string.contains(".") {
+                        string.push('.');
+                    }
+                },
+                Keyboard::ForwardSlash => {
+                    if !string.contains("/") {
+                        string.push('/');
+                    }
+                },
+                Keyboard::RightArrow => {
+                    if !string.contains("→") {
+                        string.push('→');
+                    }
+                },
+                Keyboard::LeftArrow => {
+                    if !string.contains("←") {
+                        string.push('←');
+                    }
+                },
+                Keyboard::DownArrow => {
+                    if !string.contains("↓") {
+                        string.push('↓');
+                    }
+                },
+                Keyboard::UpArrow => {
+                    if !string.contains("↑") {
+                        string.push('↑');
+                    }
+                },
+                Keyboard::LeftControl => {
+                    ctrl = true;
+                },
+                Keyboard::LeftShift => {
+                    shift = true;
+                },
+                Keyboard::LeftAlt => {
+                    alt = true;
+                },
+                Keyboard::LeftGUI => {
+                    gui = true;
+                },
+                Keyboard::RightControl => {
+                    ctrl = true;
+                },
+                Keyboard::RightShift => {
+                    shift = true;
+                },
+                Keyboard::RightAlt => {
+                    alt = true;
+                },
+                Keyboard::RightGUI => {
+                    gui = true;
+                },
+
+                _ => unimplemented!(),
+            }
+        }
+
+        Chord {
+            ctrl,
+            alt,
+            shift,
+            gui,
+            string,
+        }
+    }
+}

@@ -12,7 +12,7 @@ use iced::{Element, Length, Point, Rectangle, Theme};
 
 use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD};
 use crate::macro_parser::{self, Macro, MacroFrame};
-use crate::type_wrapper::{ConsumerWrapper, KeyboardWrapper};
+use crate::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
 
 const CLOSE_BUTTON_PADDING: f32 = 1.0;
 const CLOSE_BUTTON_OFFSET: Vector = Vector::new(
@@ -251,7 +251,7 @@ pub enum ActionOptions {
     ),
     String(String, Option<Duration>),
     Chord(
-        Vec<usbd_human_interface_device::page::Keyboard>,
+        Chord,
         Option<Duration>,
     ),
     Loop(u8),
@@ -356,7 +356,7 @@ impl SelectedAction {
             }
             ActionOptions::Chord(keys, delay) => {
                 if let ActionWrapper::Chord(_, _) = action.get_action() {
-                    action.set_action(ActionWrapper::Chord(keys.clone(), *delay));
+                    action.set_action(ActionWrapper::Chord(keys.clone().into(), *delay));
                 } else {
                     unreachable!()
                 }
@@ -760,7 +760,7 @@ pub enum ActionWrapper {
     ),
     String(String, Option<Duration>),
     Chord(
-        Vec<usbd_human_interface_device::page::Keyboard>,
+        Chord,
         Option<Duration>,
     ),
     Loop(Vec<Action>, u8),
@@ -828,7 +828,7 @@ impl From<MacroFrame> for MacroAction {
                 ActionWrapper::ConsumerPress(key, delay)
             }
             macro_parser::ActionType::String(string, delay) => ActionWrapper::String(string, delay),
-            macro_parser::ActionType::Chord(keys, delay) => ActionWrapper::Chord(keys, delay),
+            macro_parser::ActionType::Chord(keys, delay) => ActionWrapper::Chord(keys.into(), delay),
             macro_parser::ActionType::Loop(frames, loop_count) => {
                 let mut actions = Vec::new();
                 for frame in frames {
@@ -863,7 +863,7 @@ impl From<MacroAction> for MacroFrame {
                 ActionWrapper::String(string, delay) => {
                     macro_parser::ActionType::String(string, delay)
                 }
-                ActionWrapper::Chord(keys, delay) => macro_parser::ActionType::Chord(keys, delay),
+                ActionWrapper::Chord(keys, delay) => macro_parser::ActionType::Chord(keys.into(), delay),
                 ActionWrapper::Loop(actions, loop_count) => {
                     let mut frames = Vec::new();
                     for action in actions {
@@ -1770,8 +1770,8 @@ impl Arguments {
         self
     }
 
-    pub fn with_chord(mut self, keys: Vec<usbd_human_interface_device::page::Keyboard>) -> Self {
-        let content = KeyboardWrapper::get_chord_string(&keys);
+    pub fn with_chord(mut self, chord: Chord) -> Self {
+        let content = chord.string;
         let content = if content.len() > 7 {
             format!("{}...", &content[0..4])
         } else {
@@ -1790,10 +1790,10 @@ impl Arguments {
 
         self.offset += 50.0 + Arguments::offset_from_text("Chord:".to_string()) + TITLE_OFFSET.x;
 
-        self.with_labeled_boolean("CTRL", true)
-            .with_labeled_boolean("SHIFT", false)
-            .with_labeled_boolean("ALT", true)
-            .with_labeled_boolean("GUI", true)
+        self.with_labeled_boolean("CTRL", chord.ctrl)
+            .with_labeled_boolean("SHIFT", chord.shift)
+            .with_labeled_boolean("ALT", chord.alt)
+            .with_labeled_boolean("GUI", chord.gui)
     }
 
     pub fn with_labeled_number(mut self, label: &str, number: f32) -> Self {
