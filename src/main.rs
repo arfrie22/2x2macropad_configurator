@@ -569,8 +569,24 @@ impl Application for Configurator {
                     self.settings_tab.press_time_text = text;
                 }
             },
-            Message::MacroActionStringChangedText(string) => todo!(),
-            Message::MacroActionChordChangedText(string) => todo!(),
+            Message::MacroActionStringChangedText(content) => {
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    self.key_tab.action_option_controls.string_text = content.to_string();
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::String(string, _) => {
+                            *string = content.to_string();
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
+            },
+            Message::MacroActionChordChangedText(content) => {
+                
+            },
             Message::MacroActionChordCtrl(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     match &mut action.action_options {
