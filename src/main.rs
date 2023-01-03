@@ -852,19 +852,20 @@ impl Application for Configurator {
                 let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
                     let action_delay = container(column![
                         text("Action Delay (ms)").font(ROBOTO).size(30),
-                                    Space::with_height(Length::Units(10)),
-                                    checkbox(
-                                        "Use Default Delay",
-                                        action.delay.is_none(),
-                                        Message::SelectedActionUseDefaultDelay
-                                    ),
-                                    Space::with_height(Length::Units(10)),
-                                    text_input(
-                                        (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
-                                        self.key_tab.action_option_controls.delay_text.as_str(),
-                                        Message::MacroActionDelayChangedText
-                                    ).font(ROBOTO),
+                        Space::with_height(Length::Units(10)),
+                        checkbox(
+                            "Use Default Delay",
+                            action.delay.is_none(),
+                            Message::SelectedActionUseDefaultDelay
+                        ),
+                        Space::with_height(Length::Units(10)),
+                        text_input(
+                            (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                            self.key_tab.action_option_controls.delay_text.as_str(),
+                            Message::MacroActionDelayChangedText
+                        ).font(ROBOTO),
                     ]);
+
 
                     match &action.action_options {
                         macro_editor::ActionOptions::Empty => {
@@ -897,34 +898,158 @@ impl Application for Configurator {
                                 action_delay,
                             ]
                         },
-                        macro_editor::ActionOptions::KeyDown(_) => {
+                        macro_editor::ActionOptions::KeyDown(key) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Key").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                pick_list(
+                                    &type_wrapper::KeyboardWrapper::KEYS[..],
+                                    Some(key.clone().into()),
+                                    Message::MacroActionChooseKey
+                                ),
                             ]
                         },
-                        macro_editor::ActionOptions::KeyUp(_) => {
+                        macro_editor::ActionOptions::KeyUp(key) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Key").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                pick_list(
+                                    &type_wrapper::KeyboardWrapper::KEYS[..],
+                                    Some(key.clone().into()),
+                                    Message::MacroActionChooseKey
+                                ),
                             ]
                         },
-                        macro_editor::ActionOptions::KeyPress(_, _) => {
+                        macro_editor::ActionOptions::KeyPress(key, delay) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Key").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                pick_list(
+                                    &type_wrapper::KeyboardWrapper::KEYS[..],
+                                    Some(key.clone().into()),
+                                    Message::MacroActionChooseKey
+                                ),
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Use Default Delay",
+                                    delay.is_none(),
+                                    Message::SelectedActionSubUseDefaultDelay
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    self.key_tab.action_option_controls.sub_delay_text.as_str(),
+                                    Message::MacroActionSubDelayChangedText
+                                ).font(ROBOTO),
                             ]
                         },
-                        macro_editor::ActionOptions::ConsumerPress(_, _) => {
+                        macro_editor::ActionOptions::ConsumerPress(key, delay) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Consumer").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                pick_list(
+                                    &type_wrapper::ConsumerWrapper::KEYS[..],
+                                    Some(key.clone().into()),
+                                    Message::MacroActionChooseConsumer
+                                ),
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Use Default Delay",
+                                    delay.is_none(),
+                                    Message::SelectedActionSubUseDefaultDelay
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    self.key_tab.action_option_controls.sub_delay_text.as_str(),
+                                    Message::MacroActionSubDelayChangedText
+                                ).font(ROBOTO),
                             ]
                         },
-                        macro_editor::ActionOptions::String(_, _) => {
+                        macro_editor::ActionOptions::String(string, delay) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Text").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    string.as_str(),
+                                    self.key_tab.action_option_controls.string_text.as_str(),
+                                    Message::MacroActionStringChangedText
+                                ).font(ROBOTO),
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Letter Delay (ms)").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Use Default Delay",
+                                    delay.is_none(),
+                                    Message::SelectedActionSubUseDefaultDelay
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    self.key_tab.action_option_controls.sub_delay_text.as_str(),
+                                    Message::MacroActionSubDelayChangedText
+                                ).font(ROBOTO),
                             ]
                         },
-                        macro_editor::ActionOptions::Chord(_, _) => {
+                        macro_editor::ActionOptions::Chord(keys, delay) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Keys").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                // text_input(
+                                //     string.as_str(),
+                                //     self.key_tab.action_option_controls.string_text.as_str(),
+                                //     Message::MacroActionStringChangedText
+                                // ).font(ROBOTO),
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                checkbox(
+                                    "Use Default Delay",
+                                    delay.is_none(),
+                                    Message::SelectedActionSubUseDefaultDelay
+                                ),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    self.key_tab.action_option_controls.sub_delay_text.as_str(),
+                                    Message::MacroActionSubDelayChangedText
+                                ).font(ROBOTO),
                             ]
                         },
                         macro_editor::ActionOptions::Loop(count) => {
