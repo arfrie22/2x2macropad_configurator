@@ -691,11 +691,13 @@ impl Application for Configurator {
                             }),
                     ],
 
+
+
                     container(row![
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
-                        Space::with_width(Length::Units(20)),
+                        Space::with_width(Length::Units(40)),
                         button("Save").on_press(Message::SaveMacro),
-                        ]).height(Length::Fill).align_y(alignment::Vertical::Bottom)
+                        ]).width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom)
                 ]).width(Length::Units(300)).height(Length::Fill).padding(Padding {
                     top: 0,
                     right: 0,
@@ -704,15 +706,14 @@ impl Application for Configurator {
                 });
 
                 let message = column![
-                    text(format!("Edit the {} macro for key {}", match macro_type {
-                        macro_parser::MacroType::Tap => "single tap",
-                        macro_parser::MacroType::Hold => "hold",
-                        macro_parser::MacroType::DoubleTap => "double tap",
-                        macro_parser::MacroType::TapHold => "tap and hold",
+                    text(format!("Edit The {} Macro for Key {}", match macro_type {
+                        macro_parser::MacroType::Tap => "Single Tap",
+                        macro_parser::MacroType::Hold => "Hold",
+                        macro_parser::MacroType::DoubleTap => "Double Tap",
+                        macro_parser::MacroType::TapHold => "Tap and Hold",
                     }, i))
                         .font(ROBOTO)
                         .size(60),
-                    button("Back").on_press(Message::ButtonPressed(*i)),
                     row![
                         self.key_tab
                             .editor
