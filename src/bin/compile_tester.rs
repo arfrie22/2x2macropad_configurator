@@ -170,6 +170,41 @@ fn main() {
             macropad_wrapper::validate_macro(&d, 7, &macro_data_4).unwrap();
 
 
+            let mut mac_1 = Macro::new();
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::Empty,
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::SetLed((255, 0, 0)),
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::ClearLed,
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::KeyDown(Keyboard::A),
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::KeyUp(Keyboard::A),
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::KeyPress(Keyboard::A, None),
+                delay: None,
+            });
+            mac_1.add_frame(MacroFrame {
+                action: ActionType::ConsumerPress(Consumer::VolumeIncrement, None),
+                delay: None,
+            });
+
+            let macro_data_1 = mac_1.pack().unwrap();
+            macropad_wrapper::clear_macro(&d, 4).unwrap();
+            macropad_wrapper::set_macro(&d, 4, &macro_data_1).unwrap();
+            macropad_wrapper::validate_macro(&d, 4, &macro_data_1).unwrap();
+
             println!("{:?}", macro_parser::get_macro_pad(&d).unwrap());
         }
     }

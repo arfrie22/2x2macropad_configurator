@@ -414,7 +414,7 @@ impl Application for Configurator {
                         self.key_tab.action_option_controls.delay_text = "".to_string();
                     } else {
                         action.delay = Some(Duration::from_millis(self.settings_tab.config.default_delay as u64));
-                        self.key_tab.action_option_controls.delay_text = self.settings_tab.config.default_delay.to_string();
+                        self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
                     }
                     
                     action.update_action(&self.key_tab.editor_actions.as_slice());
@@ -501,7 +501,7 @@ impl Application for Configurator {
                         self.key_tab.action_option_controls.delay_text = "".to_string();
                         None
                     } else {
-                        self.key_tab.action_option_controls.delay_text = self.settings_tab.config.default_delay.to_string();
+                        self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
                         Some(Duration::from_millis(self.settings_tab.config.default_delay as u64))
                     };
 
@@ -869,9 +869,24 @@ impl Application for Configurator {
                                 action_delay,
                             ]
                         },
-                        macro_editor::ActionOptions::SetLed(_) => {
+                        macro_editor::ActionOptions::SetLed(color) => {
                             column![
                                 action_delay,
+
+                                Space::with_height(Length::Units(20)),
+
+                                text("LED Color").font(ROBOTO).size(30),
+                                ColorPicker::new(
+                                    self.key_tab.action_option_controls.show_color_picker,
+                                    Color::from_rgb8(
+                                        color.0,
+                                        color.1,
+                                        color.2
+                                    ),
+                                    button("Pick Color").on_press(Message::MacroActionPickColor),
+                                    Message::MacroActionCancelColor,
+                                    Message::MacroActionSubmitColor,
+                                )
                             ]
                         },
                         macro_editor::ActionOptions::ClearLed => {
@@ -912,6 +927,7 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::Loop(count) => {
                             column![
                                 action_delay,
+
                                 Space::with_height(Length::Units(20)),
 
                                 text("Loop Count").font(ROBOTO).size(30),
