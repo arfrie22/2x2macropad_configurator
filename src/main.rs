@@ -423,9 +423,9 @@ impl Application for Configurator {
             }
             Message::MacroActionDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
-                    self.key_tab.action_option_controls.delay_text = text;
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
                         if let Some(delay) = action.delay.as_mut() {
+                            self.key_tab.action_option_controls.delay_text = text;
                             *delay = Duration::from_millis(ms as u64);
                             
                         }
@@ -528,27 +528,30 @@ impl Application for Configurator {
             }
             Message::MacroActionSubDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
-                    self.key_tab.action_option_controls.sub_delay_text = text;
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
                         match &mut action.action_options {
                             macro_editor::ActionOptions::KeyPress(_, delay) => {
                                 if let Some(delay) = delay.as_mut() {
                                     *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
                             },
                             macro_editor::ActionOptions::ConsumerPress(_, delay) => {
                                 if let Some(delay) = delay.as_mut() {
                                     *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
                             },
                             macro_editor::ActionOptions::String(_, delay) => {
                                 if let Some(delay) = delay.as_mut() {
                                     *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
                             },
                             macro_editor::ActionOptions::Chord(_, delay) => {
                                 if let Some(delay) = delay.as_mut() {
                                     *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
                             },
 
@@ -859,7 +862,7 @@ impl Application for Configurator {
                                     text_input(
                                         (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
                                         self.key_tab.action_option_controls.delay_text.as_str(),
-                                        Message::DefaultDelayChangedText
+                                        Message::MacroActionDelayChangedText
                                     ).font(ROBOTO),
                     ]);
 
