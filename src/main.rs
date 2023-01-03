@@ -18,7 +18,7 @@ use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction};
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
-use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper};
+use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
 use macropad_configurator::{
     hid_manager, macro_editor, macro_parser, macropad, macropad_wrapper, type_wrapper,
 };
@@ -570,6 +570,7 @@ impl Application for Configurator {
                 }
             },
             Message::MacroActionStringChangedText(content) => {
+                // TODO: add \n and \t support
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     self.key_tab.action_option_controls.string_text = content.to_string();
                     match &mut action.action_options {
@@ -585,7 +586,29 @@ impl Application for Configurator {
                 }
             },
             Message::MacroActionChordChangedText(content) => {
-                
+                // TODO: add \n, esc, and \t support
+
+                let mut keys = Vec::new();
+
+                for letter in content.chars() {
+                    keys.push(KeyboardWrapper::from_char(letter).0);
+                }
+
+                let content = Chord::from(keys).string;
+
+                if let Some(action) = self.key_tab.selected_action.as_mut() {
+                    self.key_tab.action_option_controls.chord_text = content.to_string();
+                    match &mut action.action_options {
+                        macro_editor::ActionOptions::Chord(chord, _) => {
+                            chord.string = content.to_string();
+                        },
+
+                        _ => unreachable!(),
+                    }
+
+                    action.update_action(&self.key_tab.editor_actions.as_slice());
+                    self.key_tab.editor.request_redraw();
+                }
             },
             Message::MacroActionChordCtrl(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
