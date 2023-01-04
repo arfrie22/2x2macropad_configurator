@@ -12,7 +12,7 @@ use iced::{Element, Length, Point, Rectangle, Theme};
 
 use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD};
 use crate::macro_parser::{self, Macro, MacroFrame};
-use crate::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
+use crate::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 
 const CLOSE_BUTTON_PADDING: f32 = 1.0;
 const CLOSE_BUTTON_OFFSET: Vector = Vector::new(
@@ -23,6 +23,9 @@ const CLOSE_BUTTON_SIZE: Size = Size::new(
     ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING),
     ACTION_SIZE.height - (2.0 * CLOSE_BUTTON_PADDING),
 );
+
+const ADD_BUTTON_RADIUS: f32 = 25.0;
+const ADD_BUTTON_PADDING: f32 = 10.0;
 
 const DELAY_OFFSET: Vector = Vector::new(
     ACTION_SIZE.width - 10.0 - CLOSE_BUTTON_SIZE.width,
@@ -83,48 +86,6 @@ impl Index {
         }
     }
 
-    // pub fn get_top_left(&self, scroll_offset: Vector) -> Point {
-    //     match self {
-    //         Index::ImaginaryIndex { action_index, parent_index } => {
-    //             let x = parent_index.try_lock().unwrap().get_level() as f32 * LOOP_PADDING;
-    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
-
-    //             Point::new(0.0, y) - scroll_offset
-    //         },
-    //         Index::Index { action_index, .. } => {
-    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
-
-    //             Point::new(0.0, y) - scroll_offset
-    //         },
-    //         Index::Nested { action_index, .. } => {
-    //             let x = self.get_level() as f32 * LOOP_PADDING;
-    //             let y = *action_index as f32 * (ACTION_SIZE.height + ACTION_PADDING);
-
-    //             Point::new(x, y) - scroll_offset
-    //         },
-    //     }
-    // }
-
-    // pub fn get_offset(&self, scroll_offset: Vector, point: Point) -> Option<Vector> {
-    //     let top_left = self.get_top_left(scroll_offset);
-    //     let bounds = Rectangle::new(top_left, ACTION_SIZE);
-
-    //     if bounds.contains(point) {
-    //         Some(point - top_left)
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    // pub fn on_close_button(offset: Vector) -> bool {
-    //     let close_button_bounds = Rectangle::new(
-    //         Point::ORIGIN + Self::CLOSE_BUTTON_OFFSET,
-    //         Self::CLOSE_BUTTON_SIZE
-    //     );
-
-    //     close_button_bounds.contains(Point::ORIGIN + offset)
-    // }
-
     fn avoid_collisions(&self, new_index: &mut Index) {
         if !new_index.parents.is_empty() {
             if !self.parents.is_empty() {
@@ -152,7 +113,7 @@ impl Index {
         if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
-                let mut parent_index = parents.remove(0);
+                let parent_index = parents.remove(0);
                 let index = Index {
                     index: index.index,
                     parents,
@@ -250,10 +211,7 @@ pub enum ActionOptions {
         Option<Duration>,
     ),
     String(String, Option<Duration>),
-    Chord(
-        Chord,
-        Option<Duration>,
-    ),
+    Chord(Chord, Option<Duration>),
     Loop(u8),
 }
 
@@ -378,6 +336,7 @@ impl SelectedAction {
 pub enum Message {
     MoveFrame(Index, Index),
     RemoveFrame(Index),
+    OpenAddMenu,
     AddFrame(MacroFrame, Index),
     SelectFrame(Option<SelectedAction>),
     ReleaseGrab,
@@ -389,6 +348,7 @@ pub enum Message {
 pub struct State {
     cache: canvas::Cache,
     scroll_offset: Vector,
+    add_menu_open: bool,
 }
 
 const ACTION_SIZE: Size = Size::new(600.0, 50.0);
@@ -396,6 +356,10 @@ const ACTION_PADDING: f32 = 10.0;
 const LOOP_PADDING: f32 = 50.0;
 
 impl State {
+    pub fn toggle_add_menu(&mut self) {
+        self.add_menu_open = !self.add_menu_open;
+    }
+
     pub fn view<'a>(&'a self, actions: &'a [Action]) -> Element<'a, Message> {
         Canvas::new(Editor {
             state: self,
@@ -473,7 +437,7 @@ impl<'a> Editor<'a> {
 }
 
 impl<'a> canvas::Program<Message> for Editor<'a> {
-    type State = (Option<Drag>, Option<Action>);
+    type State = (Option<Drag>, Option<Action>, bool);
 
     fn update(
         &self,
@@ -508,14 +472,16 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                         Some(Message::Scroll(scroll_offset))
                     }
                     mouse::Event::ButtonPressed(mouse::Button::Left) => match *state {
-                        (None, _) => {
-                            if let Some((action, offset)) = Action::get_offset(
+                        (None, _, _) => {
+                            if Action::on_add_button(&bounds, cursor_position) {
+                                state.2 = true;
+                            } else if let Some((action, offset)) = Action::get_offset(
                                 self.actions,
                                 self.state.scroll_offset,
                                 cursor_position,
                             ) {
                                 if action.on_close_button(offset) {
-                                    *state = (None, None);
+                                    *state = (None, None, state.2);
                                     return (
                                         event::Status::Captured,
                                         Some(Message::RemoveFrame(
@@ -533,6 +499,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                         moving: None,
                                     }),
                                     None,
+                                    state.2,
                                 );
 
                                 return (event::Status::Captured, None);
@@ -567,6 +534,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                                     moving: None,
                                                 }),
                                                 None,
+                                                state.2,
                                             );
                                             return (
                                                 event::Status::Captured,
@@ -602,6 +570,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                                         moving: Some(index),
                                                     }),
                                                     None,
+                                                    state.2,
                                                 );
                                                 return (event::Status::Captured, Some(message));
                                             }
@@ -617,6 +586,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                             moving,
                                         }),
                                         None,
+                                        state.2,
                                     );
 
                                     None
@@ -632,7 +602,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                             if !moved {
                                 let selected =
                                     Some(SelectedAction::from_action(&action, self.actions));
-                                *state = (None, Some(action));
+                                *state = (None, Some(action), state.2);
                                 return (
                                     event::Status::Captured,
                                     Some(Message::SelectFrame(selected)),
@@ -641,7 +611,17 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
 
                             return (event::Status::Captured, Some(Message::ReleaseGrab));
                         }
-                        None => None,
+                        None => {
+                            if state.2 && Action::on_add_button(&bounds, cursor_position) {
+                                state.2 = false;
+                                return (
+                                    event::Status::Captured,
+                                    Some(Message::OpenAddMenu),
+                                );
+                            } 
+
+                            None
+                        },
                     },
                     _ => None,
                 };
@@ -674,6 +654,41 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 Stroke::default().with_width(2.0),
             );
         });
+
+        let add_menu = {
+            let mut frame = Frame::new(bounds.size());
+            
+            frame.fill(&Path::circle(Point::new(
+                bounds.width - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+                bounds.height - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+            ), ADD_BUTTON_RADIUS), 
+            if state.2 {
+                theme.extended_palette().primary.strong.color
+            } else if let Some(cursor_position) = cursor.position_in(&bounds) {
+                if Action::on_add_button(&bounds, cursor_position) {
+                    theme.palette().primary
+                } else {
+                    theme.extended_palette().primary.strong.color
+                }
+            } else {
+                theme.extended_palette().primary.strong.color
+            });
+    
+            frame.fill_text(canvas::Text {
+                content: Icon::Add.into(),
+                position: Point::new(
+                    bounds.width - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+                    bounds.height - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+                ),
+                color: theme.palette().text,
+                size: ADD_BUTTON_RADIUS * 2.0,
+                font: ICON_FONT,
+                horizontal_alignment: iced::alignment::Horizontal::Center,
+                vertical_alignment: iced::alignment::Vertical::Center,
+            });
+
+            frame.into_geometry()
+        };
 
         if let Some(drag) = state.0.as_ref() {
             let drag_action = drag.draw(&theme, bounds, cursor);
@@ -708,9 +723,9 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
 
                 frame.into_geometry()
             };
-            vec![content, drag_action, placeholder]
+            vec![content, add_menu, drag_action, placeholder]
         } else {
-            vec![content]
+            vec![content, add_menu]
         }
     }
 
@@ -724,7 +739,9 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             Some(_) => mouse::Interaction::Grabbing,
             None => {
                 if let Some(cursor_position) = cursor.position_in(&bounds) {
-                    if let Some((action, offset)) =
+                    if Action::on_add_button(&bounds, cursor_position) {
+                        mouse::Interaction::Pointer
+                    } else if let Some((action, offset)) =
                         Action::get_offset(self.actions, self.state.scroll_offset, cursor_position)
                     {
                         if action.on_close_button(offset) {
@@ -759,10 +776,7 @@ pub enum ActionWrapper {
         Option<Duration>,
     ),
     String(String, Option<Duration>),
-    Chord(
-        Chord,
-        Option<Duration>,
-    ),
+    Chord(Chord, Option<Duration>),
     Loop(Vec<Action>, u8),
 }
 
@@ -828,7 +842,9 @@ impl From<MacroFrame> for MacroAction {
                 ActionWrapper::ConsumerPress(key, delay)
             }
             macro_parser::ActionType::String(string, delay) => ActionWrapper::String(string, delay),
-            macro_parser::ActionType::Chord(keys, delay) => ActionWrapper::Chord(keys.into(), delay),
+            macro_parser::ActionType::Chord(keys, delay) => {
+                ActionWrapper::Chord(keys.into(), delay)
+            }
             macro_parser::ActionType::Loop(frames, loop_count) => {
                 let mut actions = Vec::new();
                 for frame in frames {
@@ -863,7 +879,9 @@ impl From<MacroAction> for MacroFrame {
                 ActionWrapper::String(string, delay) => {
                     macro_parser::ActionType::String(string, delay)
                 }
-                ActionWrapper::Chord(keys, delay) => macro_parser::ActionType::Chord(keys.into(), delay),
+                ActionWrapper::Chord(keys, delay) => {
+                    macro_parser::ActionType::Chord(keys.into(), delay)
+                }
                 ActionWrapper::Loop(actions, loop_count) => {
                     let mut frames = Vec::new();
                     for action in actions {
@@ -906,6 +924,15 @@ impl Action {
             width = width.max(action.calculate_width());
         }
         width
+    }
+
+    pub fn on_add_button(bounds: &Rectangle, point: Point) -> bool {
+        Point::new(
+            bounds.width - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+            bounds.height - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
+        )
+        .distance(point)
+            <= ADD_BUTTON_RADIUS + 1.0
     }
 
     pub fn get_offset(
@@ -1272,7 +1299,10 @@ impl Action {
             frame.fill_rectangle(
                 position
                     + if let ArgumentType::Boolean(_, _) = &argument.arg_type {
-                        Vector::new(argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0, ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0) + (ARGUMENT_SIZE / 2.0))
+                        Vector::new(
+                            argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0,
+                            ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0) + (ARGUMENT_SIZE / 2.0),
+                        )
                     } else {
                         Vector::new(argument.offset, (ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0)
                     },
@@ -1316,7 +1346,12 @@ impl Action {
             } else if let ArgumentType::Boolean(boolean, content) = argument.arg_type {
                 frame.fill_rectangle(
                     position
-                        + Vector::new((argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0) + 2.5, ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0) + (ARGUMENT_SIZE / 2.0) + 2.5),
+                        + Vector::new(
+                            (argument.offset + (argument.width - ARGUMENT_SIZE) / 2.0) + 2.5,
+                            ((ACTION_SIZE.height - ARGUMENT_SIZE) / 2.0)
+                                + (ARGUMENT_SIZE / 2.0)
+                                + 2.5,
+                        ),
                     Size::new(ARGUMENT_SIZE - 5.0, ARGUMENT_SIZE - 5.0),
                     if boolean {
                         theme.palette().success
@@ -1819,7 +1854,8 @@ impl Arguments {
             post_text: None,
         });
 
-        self.offset += Arguments::offset_from_text(label.to_owned()).max(ARGUMENT_SIZE) + TITLE_OFFSET.x;
+        self.offset +=
+            Arguments::offset_from_text(label.to_owned()).max(ARGUMENT_SIZE) + TITLE_OFFSET.x;
 
         self
     }

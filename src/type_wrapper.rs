@@ -1013,7 +1013,28 @@ pub struct Chord {
     pub string: String,
 }
 
+impl Default for Chord {
+    fn default() -> Self {
+        Chord {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            gui: false,
+            string: String::new(),
+        }
+    }
+}
+
 impl Chord {
+    pub const fn new() -> Self {
+        Chord {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            gui: false,
+            string: String::new(),
+        }
+    }
 }
 
 impl From<Vec<KeyboardWrapper>> for Chord {

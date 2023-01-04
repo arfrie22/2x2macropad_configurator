@@ -22,6 +22,7 @@ pub enum Icon {
     Gear,
     Sun,
     Moon,
+    Add,
     Close,
 }
 
@@ -33,7 +34,7 @@ impl From<Icon> for char {
             Icon::Gear => '\u{f0e5}',
             Icon::Sun => '\u{f1bc}',
             Icon::Moon => '\u{ef72}',
-            Icon::Moon => '\u{ef72}',
+            Icon::Add => '\u{ea12}',
             Icon::Close => '\u{eb98}',
         }
     }

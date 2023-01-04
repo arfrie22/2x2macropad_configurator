@@ -143,6 +143,10 @@ impl Application for Configurator {
                 self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
+            Message::EditorMessage(macro_editor::Message::OpenAddMenu) => {
+                self.key_tab.editor.toggle_add_menu();
+                self.key_tab.editor.request_redraw();
+            }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
                 index.add_to_macro(frame.into(), &mut self.key_tab.editor_actions);
                 self.key_tab.select(Some(SelectedAction::from_index(&index, self.key_tab.editor_actions.as_slice())));

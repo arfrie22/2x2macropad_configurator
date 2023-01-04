@@ -33,7 +33,7 @@ iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = [
     "colors",
     "tab_bar",
     "tabs",
-    "badge"
+    "badge",
 ] }
 futures = "0.3.25"
 iced_native = "0.7"
