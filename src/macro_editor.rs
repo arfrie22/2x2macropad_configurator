@@ -699,7 +699,11 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             });
     
             frame.fill_text(canvas::Text {
-                content: Icon::Add.into(),
+                content: if self.state.add_menu_open {
+                    Icon::Close.into()
+                } else {
+                    Icon::Add.into()
+                },
                 position: Point::new(
                     bounds.width - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
                     bounds.height - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
