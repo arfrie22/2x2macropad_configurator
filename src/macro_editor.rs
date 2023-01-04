@@ -11,7 +11,7 @@ use iced::{mouse, Color, Size, Vector};
 use iced::{Element, Length, Point, Rectangle, Theme};
 
 use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD};
-use crate::macro_parser::{self, Macro, MacroFrame};
+use crate::macro_parser::{self, Macro, MacroFrame, ActionType};
 use crate::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 
 const CLOSE_BUTTON_PADDING: f32 = 1.0;
@@ -26,6 +26,11 @@ const CLOSE_BUTTON_SIZE: Size = Size::new(
 
 const ADD_BUTTON_RADIUS: f32 = 25.0;
 const ADD_BUTTON_PADDING: f32 = 10.0;
+const ADD_ITEM_SIZE: Size = Size::new(
+    80.0,
+    20.0,
+);
+const ADD_ITEM_PADDING: f32 = 5.0;
 
 const DELAY_OFFSET: Vector = Vector::new(
     ACTION_SIZE.width - 10.0 - CLOSE_BUTTON_SIZE.width,
@@ -360,6 +365,14 @@ impl State {
         self.add_menu_open = !self.add_menu_open;
     }
 
+    pub fn open_add_menu(&mut self) {
+        self.add_menu_open = true;
+    }
+
+    pub fn close_add_menu(&mut self) {
+        self.add_menu_open = false;
+    }
+
     pub fn view<'a>(&'a self, actions: &'a [Action]) -> Element<'a, Message> {
         Canvas::new(Editor {
             state: self,
@@ -475,6 +488,9 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                         (None, _, _) => {
                             if Action::on_add_button(&bounds, cursor_position) {
                                 state.2 = true;
+                            }  else if self.state.add_menu_open && Action::get_add_frame(&bounds, cursor_position).is_some() {
+                                state.2 = false;
+                                return (event::Status::Captured, Some(Message::AddFrame(Action::get_add_frame(&bounds, cursor_position).unwrap(), Index { index: self.actions.len(), parents: Vec::new() })));
                             } else if let Some((action, offset)) = Action::get_offset(
                                 self.actions,
                                 self.state.scroll_offset,
@@ -649,6 +665,14 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 &state.0,
             );
 
+            if self.state.add_menu_open {
+                Action::draw_add_menu(
+                    frame,
+                    theme,
+                    &bounds,
+                );
+            }
+
             frame.stroke(
                 &Path::rectangle(Point::ORIGIN, frame.size()),
                 Stroke::default().with_width(2.0),
@@ -740,6 +764,8 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             None => {
                 if let Some(cursor_position) = cursor.position_in(&bounds) {
                     if Action::on_add_button(&bounds, cursor_position) {
+                        mouse::Interaction::Pointer
+                    } else if self.state.add_menu_open && Action::get_add_frame(&bounds, cursor_position).is_some() {
                         mouse::Interaction::Pointer
                     } else if let Some((action, offset)) =
                         Action::get_offset(self.actions, self.state.scroll_offset, cursor_position)
@@ -933,6 +959,73 @@ impl Action {
         )
         .distance(point)
             <= ADD_BUTTON_RADIUS + 1.0
+    }
+
+    const ACTION: [(ActionType, &str); 10] = {
+        use usbd_human_interface_device::page::{Keyboard, Consumer};
+        [
+            (ActionType::Empty, "Empty"),
+            (ActionType::SetLed((0, 0, 0)), "Set LED"),
+            (ActionType::ClearLed, "Clear LED"),
+            (ActionType::KeyDown(Keyboard::NoEventIndicated), "Key Down"),
+            (ActionType::KeyUp(Keyboard::NoEventIndicated), "Key Up"),
+            (ActionType::KeyPress(Keyboard::NoEventIndicated, None), "Key Press"),
+            (ActionType::ConsumerPress(Consumer::Unassigned, None), "Consumer Press"),
+            (ActionType::String(String::new(), None), "String"),
+            (ActionType::Chord(vec![], None), "Chord"),
+            (ActionType::Loop(vec![], 1), "Loop"),
+        ]
+    };
+
+    pub fn draw_add_menu(
+        frame: &mut Frame,
+        theme: &Theme,
+        bounds: &Rectangle
+    ) {
+        let mut index = Action::ACTION.len();
+        for (_, name) in Action::ACTION.iter() {
+            index -= 1;
+            let top_left = Point::new(
+                bounds.width - ADD_BUTTON_PADDING - ADD_ITEM_SIZE.width,
+                bounds.height - ((ADD_BUTTON_PADDING + ADD_BUTTON_RADIUS) * 2.0) - ADD_ITEM_SIZE.height - (index as f32 * (ADD_ITEM_SIZE.height + ADD_ITEM_PADDING)),
+            );
+
+            frame.fill_rectangle(top_left, ADD_ITEM_SIZE, theme.extended_palette().background.weak.color);
+            frame.fill_text(canvas::Text {
+                content: name.to_string(),
+                position: top_left + Vector::new(ADD_ITEM_SIZE.width / 2.0, ADD_ITEM_SIZE.height / 2.0),
+                size: 12.0,
+                color: theme.palette().text,
+                font: ROBOTO,
+                horizontal_alignment: iced::alignment::Horizontal::Center,
+                vertical_alignment: iced::alignment::Vertical::Center,
+            });
+        }
+    }
+
+    pub fn get_add_frame(
+        bounds: &Rectangle,
+        point: Point,
+    ) -> Option<MacroFrame> {
+        let mut index = Action::ACTION.len();
+        for (action, _) in Action::ACTION.iter() {
+            index -= 1;
+            let top_left = Point::new(
+                bounds.width - ADD_BUTTON_PADDING - ADD_ITEM_SIZE.width,
+                bounds.height - ((ADD_BUTTON_PADDING + ADD_BUTTON_RADIUS) * 2.0) - ADD_ITEM_SIZE.height - (index as f32 * (ADD_ITEM_SIZE.height + ADD_ITEM_PADDING)),
+            );
+            
+            let rect = Rectangle::new(top_left, ADD_ITEM_SIZE);
+
+            if rect.contains(point) {
+                return Some(MacroFrame {
+                    action: action.clone(),
+                    delay: None,
+                });
+            }
+        }
+
+        None
     }
 
     pub fn get_offset(
