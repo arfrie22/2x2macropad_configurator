@@ -58,7 +58,7 @@ impl Index {
     }
 
     fn get_action_recurse(index: Index, root: Action) -> Action {
-        if let ActionWrapper::Loop(actions, _) = root.get_action() {
+        if let ActionWrapper::Loop(actions, _, _) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
                 let parent_index = parents.remove(0);
@@ -115,7 +115,7 @@ impl Index {
     }
 
     fn add_to_macro_recurse(index: Index, action: Action, root: Action) {
-        if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
+        if let ActionWrapper::Loop(mut actions, delay, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
                 let parent_index = parents.remove(0);
@@ -127,7 +127,7 @@ impl Index {
             } else {
                 let mut actions = actions.clone();
                 actions.insert(index.index, action);
-                root.set_action(ActionWrapper::Loop(actions, count));
+                root.set_action(ActionWrapper::Loop(actions, delay, count));
             }
         } else {
             unreachable!()
@@ -152,7 +152,7 @@ impl Index {
     }
 
     fn remove_from_macro_recurse(index: Index, root: Action) -> Action {
-        if let ActionWrapper::Loop(mut actions, count) = root.get_action() {
+        if let ActionWrapper::Loop(mut actions, delay, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
                 let mut parent_index = parents.remove(0);
@@ -164,7 +164,7 @@ impl Index {
             } else {
                 let mut actions = actions.clone();
                 let action = actions.remove(index.index);
-                root.set_action(ActionWrapper::Loop(actions, count));
+                root.set_action(ActionWrapper::Loop(actions, delay, count));
                 action
             }
         } else {
@@ -209,22 +209,22 @@ pub enum ActionOptions {
     KeyUp(usbd_human_interface_device::page::Keyboard),
     KeyPress(
         usbd_human_interface_device::page::Keyboard,
-        Option<Duration>,
+        Duration,
     ),
     ConsumerPress(
         usbd_human_interface_device::page::Consumer,
-        Option<Duration>,
+        Duration,
     ),
-    String(String, Option<Duration>),
-    Chord(Chord, Option<Duration>),
-    Loop(u8),
+    String(String, Duration),
+    Chord(Chord, Duration),
+    Loop(Duration, u8),
 }
 
 #[derive(Debug, Clone)]
 pub struct SelectedAction {
     pub index: Index,
     pub action_options: ActionOptions,
-    pub delay: Option<Duration>,
+    pub delay: Duration,
 }
 
 impl SelectedAction {
@@ -238,7 +238,7 @@ impl SelectedAction {
             ActionWrapper::ConsumerPress(key, delay) => ActionOptions::ConsumerPress(key, delay),
             ActionWrapper::String(string, delay) => ActionOptions::String(string, delay),
             ActionWrapper::Chord(keys, delay) => ActionOptions::Chord(keys, delay),
-            ActionWrapper::Loop(_, count) => ActionOptions::Loop(count),
+            ActionWrapper::Loop(_, delay, count) => ActionOptions::Loop(delay, count),
             ActionWrapper::Empty => ActionOptions::Empty,
         };
 
@@ -324,9 +324,9 @@ impl SelectedAction {
                     unreachable!()
                 }
             }
-            ActionOptions::Loop(count) => {
-                if let ActionWrapper::Loop(actions, _) = action.get_action() {
-                    action.set_action(ActionWrapper::Loop(actions.clone(), *count));
+            ActionOptions::Loop(delay, count) => {
+                if let ActionWrapper::Loop(actions, _, _) = action.get_action() {
+                    action.set_action(ActionWrapper::Loop(actions.clone(), *delay, *count));
                 } else {
                     unreachable!()
                 }
@@ -799,21 +799,21 @@ pub enum ActionWrapper {
     KeyUp(usbd_human_interface_device::page::Keyboard),
     KeyPress(
         usbd_human_interface_device::page::Keyboard,
-        Option<Duration>,
+        Duration,
     ),
     ConsumerPress(
         usbd_human_interface_device::page::Consumer,
-        Option<Duration>,
+        Duration,
     ),
-    String(String, Option<Duration>),
-    Chord(Chord, Option<Duration>),
-    Loop(Vec<Action>, u8),
+    String(String, Duration),
+    Chord(Chord, Duration),
+    Loop(Vec<Action>, Duration, u8),
 }
 
 impl ActionWrapper {
     fn calculate_length(&self) -> usize {
         match self {
-            ActionWrapper::Loop(actions, _) => {
+            ActionWrapper::Loop(actions, _, _) => {
                 let mut length = 2;
                 for action in actions {
                     length += action.calculate_length();
@@ -826,7 +826,7 @@ impl ActionWrapper {
 
     fn calculate_width(&self) -> usize {
         match self {
-            ActionWrapper::Loop(actions, _) => {
+            ActionWrapper::Loop(actions, _, _) => {
                 if actions.is_empty() {
                     1
                 } else {
@@ -846,7 +846,7 @@ impl ActionWrapper {
 #[derive(Debug, Clone)]
 pub struct MacroAction {
     action: ActionWrapper,
-    delay: Option<Duration>,
+    delay: Duration,
 }
 
 impl MacroAction {
@@ -875,12 +875,12 @@ impl From<MacroFrame> for MacroAction {
             macro_parser::ActionType::Chord(keys, delay) => {
                 ActionWrapper::Chord(keys.into(), delay)
             }
-            macro_parser::ActionType::Loop(frames, loop_count) => {
+            macro_parser::ActionType::Loop(frames, delay, loop_count) => {
                 let mut actions = Vec::new();
                 for frame in frames {
                     actions.push(Action::from(frame));
                 }
-                ActionWrapper::Loop(actions, loop_count)
+                ActionWrapper::Loop(actions, delay, loop_count)
             }
         };
         let length = action.calculate_length();
@@ -912,12 +912,12 @@ impl From<MacroAction> for MacroFrame {
                 ActionWrapper::Chord(keys, delay) => {
                     macro_parser::ActionType::Chord(keys.into(), delay)
                 }
-                ActionWrapper::Loop(actions, loop_count) => {
+                ActionWrapper::Loop(actions, delay, loop_count) => {
                     let mut frames = Vec::new();
                     for action in actions {
                         frames.push(action.into());
                     }
-                    macro_parser::ActionType::Loop(frames, loop_count)
+                    macro_parser::ActionType::Loop(frames, delay, loop_count)
                 }
             },
             delay: action.delay,
@@ -973,11 +973,11 @@ impl Action {
             (ActionType::ClearLed, "Clear LED"),
             (ActionType::KeyDown(Keyboard::NoEventIndicated), "Key Down"),
             (ActionType::KeyUp(Keyboard::NoEventIndicated), "Key Up"),
-            (ActionType::KeyPress(Keyboard::NoEventIndicated, None), "Key Press"),
-            (ActionType::ConsumerPress(Consumer::Unassigned, None), "Consumer Press"),
-            (ActionType::String(String::new(), None), "String"),
-            (ActionType::Chord(vec![], None), "Chord"),
-            (ActionType::Loop(vec![], 1), "Loop"),
+            (ActionType::KeyPress(Keyboard::NoEventIndicated, Duration::ZERO), "Key Press"),
+            (ActionType::ConsumerPress(Consumer::Unassigned, Duration::ZERO), "Consumer Press"),
+            (ActionType::String(String::new(), Duration::ZERO), "String"),
+            (ActionType::Chord(vec![], Duration::ZERO), "Chord"),
+            (ActionType::Loop(vec![], Duration::ZERO, 1), "Loop"),
         ]
     };
 
@@ -1024,7 +1024,7 @@ impl Action {
             if rect.contains(point) {
                 return Some(MacroFrame {
                     action: action.clone(),
-                    delay: None,
+                    delay: Duration::ZERO,
                 });
             }
         }
@@ -1040,7 +1040,7 @@ impl Action {
         let mut index = 0;
         for action in actions {
             match action.get_action() {
-                ActionWrapper::Loop(actions, _) => {
+                ActionWrapper::Loop(actions, _, _) => {
                     let top_left =
                         Point::new(0.0, index as f32 * (ACTION_SIZE.height + ACTION_PADDING))
                             - scroll_offset;
@@ -1106,7 +1106,7 @@ impl Action {
                 continue;
             }
             match action.get_action() {
-                ActionWrapper::Loop(loop_actions, _) => {
+                ActionWrapper::Loop(loop_actions, _, _) => {
                     let loop_index = action.index_from(all_actions).unwrap();
                     let top_left = Point::new(
                         -LOOP_PADDING,
@@ -1238,7 +1238,7 @@ impl Action {
             }
 
             match action.get_action() {
-                ActionWrapper::Loop(actions, _) => {
+                ActionWrapper::Loop(actions, _, _) => {
                     index += 1;
                     let mut parents = parents.clone();
                     parents.push(index);
@@ -1264,7 +1264,7 @@ impl Action {
             }
 
             match action.get_action() {
-                ActionWrapper::Loop(actions, _) => {
+                ActionWrapper::Loop(actions, _, _) => {
                     let mut parents = parents.clone();
                     parents.push(index);
                     if let Ok(index) = self.index_from_recurse(actions.as_slice(), parents) {
@@ -1289,11 +1289,11 @@ impl Action {
         self.0.try_borrow().unwrap().action.clone()
     }
 
-    pub fn get_delay(&self) -> Option<Duration> {
+    pub fn get_delay(&self) -> Duration {
         self.0.try_borrow().unwrap().delay.clone()
     }
 
-    pub fn set_delay(&self, delay: Option<Duration>) {
+    pub fn set_delay(&self, delay: Duration) {
         self.0.try_borrow_mut().unwrap().delay = delay;
     }
 
@@ -1353,16 +1353,10 @@ impl Action {
         frame: &mut Frame,
         theme: &Theme,
         position: Point,
-        delay: Option<Duration>,
+        delay: Duration,
     ) {
-        let delay = if let Some(delay) = delay {
-            format!("{}ms", delay.as_millis())
-        } else {
-            "Default delay".to_string()
-        };
-
         frame.fill_text(canvas::Text {
-            content: delay,
+            content: format!("{}ms", delay.as_millis()),
             position: position + DELAY_OFFSET,
             color: theme.palette().text,
             size: DELAY_SIZE,
@@ -1648,7 +1642,7 @@ impl Action {
                         .with_delay(delay),
                 );
             }
-            ActionWrapper::Loop(actions, loop_count) => {
+            ActionWrapper::Loop(actions, delay, loop_count) => {
                 self.draw_base(frame, theme, position, selected_bool);
                 self.draw_close_button(frame, theme, position);
                 self.draw_action_title(frame, theme, position, "Begin Loop".to_string());
@@ -1658,6 +1652,7 @@ impl Action {
                     position,
                     selected_bool,
                     Arguments::after_title("Begin Loop".to_string())
+                        .with_delay(delay)
                         .with_labeled_number("Loop Count:", loop_count as f32),
                 );
 
@@ -1724,7 +1719,7 @@ impl Action {
         }
 
         match self.get_action() {
-            ActionWrapper::Loop(actions, _) => {
+            ActionWrapper::Loop(actions, _, _) => {
                 for loop_action in actions {
                     if loop_action.contains(action) {
                         return true;
@@ -1813,28 +1808,16 @@ impl Arguments {
         self
     }
 
-    pub fn with_delay(mut self, delay: Option<Duration>) -> Self {
+    pub fn with_delay(mut self, delay: Duration) -> Self {
         self.args.push(Argument {
-            arg_type: if let Some(delay) = delay.as_ref() {
-                ArgumentType::Number(delay.as_millis() as f32)
-            } else {
-                ArgumentType::String("Default".to_string())
-            },
+            arg_type: ArgumentType::Number(delay.as_millis() as f32),
             width: 40.0,
             pre_text: Some((self.offset, "Delay:".to_string())),
             offset: self.offset + Arguments::offset_from_text("Delay:".to_string()),
-            post_text: if delay.is_some() {
-                Some("ms".to_string())
-            } else {
-                None
-            },
+            post_text: Some("ms".to_string()),
         });
 
-        self.offset += 40.0 + Arguments::offset_from_text("Delay:".to_string()) + TITLE_OFFSET.x;
-
-        if delay.is_some() {
-            self.offset += Arguments::offset_from_text("ms".to_string());
-        }
+        self.offset += 40.0 + Arguments::offset_from_text("Delay:".to_string()) + TITLE_OFFSET.x + Arguments::offset_from_text("ms".to_string());
 
         self
     }

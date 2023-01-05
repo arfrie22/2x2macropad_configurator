@@ -118,12 +118,6 @@ pub fn connect() -> Subscription<Event> {
                                             Ok(())
                                         })
                                     },
-                                    MacropadCommand::DefaultDelay(delay) => {
-                                        macropad_wrapper::set_default_delay(&device, delay).and_then(|_| {
-                                            macropad.lock().unwrap().config.default_delay = delay;
-                                            Ok(())
-                                        })
-                                    },
                                     MacropadCommand::LedBaseColor(color) => {
                                         macropad_wrapper::set_led_base_color(&device, color).and_then(|_| {
                                             macropad.lock().unwrap().led_config.base_color = color;
@@ -239,7 +233,6 @@ pub enum MacropadCommand {
     Macro(u8, macro_parser::Macro),
     TapSpeed(u32),
     HoldSpeed(u32),
-    DefaultDelay(u32),
     LedBaseColor((u8, u8, u8)),
     LedEffect(macropad_protocol::data_protocol::LedEffect),
     LedBrightness(u8),
@@ -277,7 +270,6 @@ impl fmt::Display for Message {
                     MacropadCommand::Macro(key, macro_) => write!(f, "Set macro for key {} to {:?}", key, macro_),
                     MacropadCommand::TapSpeed(speed) => write!(f, "Set tap speed to {}", speed),
                     MacropadCommand::HoldSpeed(speed) => write!(f, "Set hold speed to {}", speed),
-                    MacropadCommand::DefaultDelay(delay) => write!(f, "Set default delay to {}", delay),
                     MacropadCommand::LedBaseColor(color) => write!(f, "Set led base color to {:?}", color),
                     MacropadCommand::LedEffect(effect) => write!(f, "Set led effect to {:?}", effect),
                     MacropadCommand::LedBrightness(brightness) => write!(f, "Set led brightness to {}", brightness),

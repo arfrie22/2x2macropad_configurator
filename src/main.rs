@@ -85,16 +85,13 @@ pub enum Message {
     LedSubmitColor(Color),
     PressTimeChangedText(String),
     HoldTimeChangedText(String),
-    DefaultDelayChangedText(String),
     SwitchTheme,
-    MacroActionUseDefaultDelay(bool),
     MacroActionDelayChangedText(String),
     MacroActionPickColor,
     MacroActionCancelColor,
     MacroActionSubmitColor(Color),
     MacroActionChooseKey(KeyboardWrapper),
     MacroActionChooseConsumer(ConsumerWrapper),
-    MacroActionSubUseDefaultDelay(bool),
     MacroActionSubDelayChangedText(String),
     MacroActionStringChangedText(String),
     MacroActionChordChangedText(String),
@@ -396,17 +393,6 @@ impl Application for Configurator {
                     self.settings_tab.hold_time_text = text;
                 }
             }
-            Message::DefaultDelayChangedText(text) => {
-                if let Ok(speed) = text.parse::<u32>() {
-                    self.settings_tab.default_delay_text = text;
-                    self.settings_tab
-                            .queue_action(hid_manager::MacropadCommand::DefaultDelay(
-                                speed * 1000,
-                            ));
-                } else if text == "" {
-                    self.settings_tab.default_delay_text = text;
-                }
-            }
             Message::SwitchTheme => {
                 self.theme = match self.theme {
                     Theme::Light => Theme::Dark,
@@ -415,28 +401,11 @@ impl Application for Configurator {
                 };
                 self.settings_tab.theme = self.theme.clone();
             }
-            Message::MacroActionUseDefaultDelay(status) => {
-                if let Some(action) = self.key_tab.selected_action.as_mut() {
-                    if status {
-                        action.delay = None;
-                        self.key_tab.action_option_controls.delay_text = "".to_string();
-                    } else {
-                        action.delay = Some(Duration::from_micros(self.settings_tab.config.default_delay as u64));
-                        self.key_tab.action_option_controls.delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
-                    }
-                    
-                    action.update_action(&self.key_tab.editor_actions.as_slice());
-                        self.key_tab.editor.request_redraw();
-                }
-            }
             Message::MacroActionDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
-                        if let Some(delay) = action.delay.as_mut() {
-                            self.key_tab.action_option_controls.delay_text = text;
-                            *delay = Duration::from_millis(ms as u64);
-                            
-                        }
+                        self.key_tab.action_option_controls.delay_text = text;
+                        action.delay = Duration::from_millis(ms as u64);
 
                         action.update_action(&self.key_tab.editor_actions.as_slice());
                         self.key_tab.editor.request_redraw();
@@ -503,64 +472,29 @@ impl Application for Configurator {
                     self.key_tab.editor.request_redraw();
                 }
             }
-            Message::MacroActionSubUseDefaultDelay(status) => {
-                if let Some(action) = self.key_tab.selected_action.as_mut() {
-                    let new_delay = if status {
-                        self.key_tab.action_option_controls.sub_delay_text = "".to_string();
-                        None
-                    } else {
-                        self.key_tab.action_option_controls.sub_delay_text = (self.settings_tab.config.default_delay / 1000).to_string();
-                        Some(Duration::from_micros(self.settings_tab.config.default_delay as u64))
-                    };
-
-                    match &mut action.action_options {
-                        macro_editor::ActionOptions::KeyPress(_, delay) => {
-                            *delay = new_delay;
-                        },
-                        macro_editor::ActionOptions::ConsumerPress(_, delay) => {
-                            *delay = new_delay;
-                        },
-                        macro_editor::ActionOptions::String(_, delay) => {
-                            *delay = new_delay;
-                        },
-                        macro_editor::ActionOptions::Chord(_, delay) => {
-                            *delay = new_delay;
-                        },
-
-                        _ => unreachable!(),
-                    }
-
-                    action.update_action(&self.key_tab.editor_actions.as_slice());
-                    self.key_tab.editor.request_redraw();
-                }
-            }
             Message::MacroActionSubDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
                         match &mut action.action_options {
                             macro_editor::ActionOptions::KeyPress(_, delay) => {
-                                if let Some(delay) = delay.as_mut() {
-                                    *delay = Duration::from_millis(ms as u64);
-                                    self.key_tab.action_option_controls.sub_delay_text = text;
-                                }
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
                             },
                             macro_editor::ActionOptions::ConsumerPress(_, delay) => {
-                                if let Some(delay) = delay.as_mut() {
-                                    *delay = Duration::from_millis(ms as u64);
-                                    self.key_tab.action_option_controls.sub_delay_text = text;
-                                }
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
                             },
                             macro_editor::ActionOptions::String(_, delay) => {
-                                if let Some(delay) = delay.as_mut() {
-                                    *delay = Duration::from_millis(ms as u64);
-                                    self.key_tab.action_option_controls.sub_delay_text = text;
-                                }
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
                             },
                             macro_editor::ActionOptions::Chord(_, delay) => {
-                                if let Some(delay) = delay.as_mut() {
-                                    *delay = Duration::from_millis(ms as u64);
-                                    self.key_tab.action_option_controls.sub_delay_text = text;
-                                }
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
+                            },
+                            macro_editor::ActionOptions::Loop(delay, _) => {
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
                             },
 
                             _ => unreachable!(),
@@ -675,7 +609,7 @@ impl Application for Configurator {
                     self.key_tab.action_option_controls.loop_count_text = count.to_string();
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
                         match &mut action.action_options {
-                            macro_editor::ActionOptions::Loop(loop_count) => {
+                            macro_editor::ActionOptions::Loop(_, loop_count) => {
                                 *loop_count = count;
 
                             },
@@ -956,14 +890,8 @@ impl Application for Configurator {
                     let action_delay = container(column![
                         text("Action Delay (ms)").font(ROBOTO).size(30),
                         Space::with_height(Length::Units(10)),
-                        checkbox(
-                            "Use Default Delay",
-                            action.delay.is_none(),
-                            Message::MacroActionUseDefaultDelay
-                        ),
-                        Space::with_height(Length::Units(10)),
                         text_input(
-                            (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                            0.to_string().as_str(),
                             self.key_tab.action_option_controls.delay_text.as_str(),
                             Message::MacroActionDelayChangedText
                         ).font(ROBOTO),
@@ -1049,14 +977,8 @@ impl Application for Configurator {
 
                                 text("Press Delay (ms)").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Use Default Delay",
-                                    delay.is_none(),
-                                    Message::MacroActionSubUseDefaultDelay
-                                ),
-                                Space::with_height(Length::Units(10)),
                                 text_input(
-                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ).font(ROBOTO),
@@ -1080,14 +1002,8 @@ impl Application for Configurator {
 
                                 text("Press Delay (ms)").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Use Default Delay",
-                                    delay.is_none(),
-                                    Message::MacroActionSubUseDefaultDelay
-                                ),
-                                Space::with_height(Length::Units(10)),
                                 text_input(
-                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ).font(ROBOTO),
@@ -1111,14 +1027,8 @@ impl Application for Configurator {
 
                                 text("Letter Delay (ms)").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Use Default Delay",
-                                    delay.is_none(),
-                                    Message::MacroActionSubUseDefaultDelay
-                                ),
-                                Space::with_height(Length::Units(10)),
                                 text_input(
-                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ).font(ROBOTO),
@@ -1168,24 +1078,29 @@ impl Application for Configurator {
 
                                 text("Press Delay (ms)").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Use Default Delay",
-                                    delay.is_none(),
-                                    Message::MacroActionSubUseDefaultDelay
-                                ),
-                                Space::with_height(Length::Units(10)),
                                 text_input(
-                                    (self.settings_tab.config.default_delay / 1000).to_string().as_str(),
+                                    0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ).font(ROBOTO),
                             ]
                         },
-                        macro_editor::ActionOptions::Loop(count) => {
+                        macro_editor::ActionOptions::Loop(delay, count) => {
                             column![
                                 action_delay,
 
                                 Space::with_height(Length::Units(20)),
+
+                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                Space::with_height(Length::Units(10)),
+                                text_input(
+                                    0.to_string().as_str(),
+                                    self.key_tab.action_option_controls.sub_delay_text.as_str(),
+                                    Message::MacroActionSubDelayChangedText
+                                ).font(ROBOTO),
+
+                                Space::with_height(Length::Units(20)),
+                                
 
                                 text("Loop Count").font(ROBOTO).size(30),
                                 Space::with_height(Length::Units(10)),
@@ -1386,35 +1301,26 @@ impl KeyTab {
                 macro_editor::ActionOptions::KeyDown(_) => {},
                 macro_editor::ActionOptions::KeyUp(_) => {},
                 macro_editor::ActionOptions::KeyPress(_, delay) => {
-                    if let Some(delay) = delay {
-                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                    }
+                    self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                 },
                 macro_editor::ActionOptions::ConsumerPress(_, delay) => {
-                    if let Some(delay) = delay {
-                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                    }
+                    self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                 },
                 macro_editor::ActionOptions::String(string, delay) => {
                     self.action_option_controls.string_text = string.clone();
-                    if let Some(delay) = delay {
-                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                    }
+                    self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                 },
                 macro_editor::ActionOptions::Chord(chord, delay) => {
                     self.action_option_controls.chord_text = chord.string.clone();
-                    if let Some(delay) = delay {
-                        self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                    }
+                    self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                 },
-                macro_editor::ActionOptions::Loop(count) => {
+                macro_editor::ActionOptions::Loop(delay, count) => {
+                    self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                     self.action_option_controls.loop_count_text = count.to_string();
                 },
             }
 
-            if let Some(delay) = select.delay {
-                self.action_option_controls.delay_text = delay.as_millis().to_string();
-            }
+            self.action_option_controls.delay_text = select.delay.as_millis().to_string();
         }
 
         self.selected_action = select;
@@ -1770,7 +1676,6 @@ struct SettingsTab {
     theme: Theme,
     press_time_text: String,
     hold_time_text: String,
-    default_delay_text: String,
     actions: HashMap<
         macropad_protocol::data_protocol::ConfigElements,
         (bool, Instant, hid_manager::MacropadCommand),
@@ -1786,7 +1691,6 @@ impl SettingsTab {
             theme,
             press_time_text: (config.tap_speed / 1000).to_string(),
             hold_time_text: (config.hold_speed / 1000).to_string(),
-            default_delay_text: (config.default_delay / 1000).to_string(),
             actions: HashMap::new(),
         }
     }
@@ -1829,17 +1733,6 @@ impl SettingsTab {
                     ),
                 );
             }
-            hid_manager::MacropadCommand::DefaultDelay(delay) => {
-                self.config.default_delay = delay;
-                self.actions.insert(
-                    macropad_protocol::data_protocol::ConfigElements::DefaultDelay,
-                    (
-                        true,
-                        Instant::now() + Duration::from_millis(ACTION_DELAY),
-                        action,
-                    ),
-                );
-            }
             _ => unreachable!(),
         }
     }
@@ -1855,7 +1748,6 @@ impl Default for SettingsTab {
             },
             press_time_text: String::from(""),
             hold_time_text: String::from(""),
-            default_delay_text: String::from(""),
             actions: HashMap::new(),
         }
     }
@@ -1916,24 +1808,6 @@ impl Tab for SettingsTab {
                     )
                     .font(ROBOTO)
                     .width(Length::Units(50)),
-                ])
-                .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
-                }),
-                container(column![
-                    text("Default Delay (ms)").font(ROBOTO).size(30),
-                    row![
-                        text_input(
-                            (self.config.default_delay / 1000).to_string().as_str(),
-                            self.default_delay_text.as_str(),
-                            Message::DefaultDelayChangedText
-                        )
-                        .font(ROBOTO)
-                        .width(Length::Units(50)),
-                    ]
                 ])
                 .padding(Padding {
                     top: 20,

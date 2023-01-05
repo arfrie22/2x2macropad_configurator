@@ -91,9 +91,9 @@ dependencies = [
 
 [[package]]
 name = "async-broadcast"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d26004fe83b2d1cd3a97609b21e39f9a31535822210fe83205d2ce48866ea61"
+checksum = "1b19760fa2b7301cf235360ffd6d3558b1ed4249edd16d6cca8d690cee265b95"
 dependencies = [
  "event-listener",
  "futures-core",
@@ -1673,9 +1673,9 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hidapi"
-version = "2.0.2"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29839436a2de4587be0b5ef083492a5dcee40ac98404e63410dc98c916251ca7"
+checksum = "a090a12b53564bcb2f6053b8be08d5f9e7b91f26953d6e8e08c9affd8aeb4ec9"
 dependencies = [
  "cc",
  "libc",
@@ -2192,9 +2192,9 @@ dependencies = [
 
 [[package]]
 name = "lyon_tessellation"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66b19b1b39823ddc178d98cbb42c70ffcd3bfbcbde589f38752bedde982269c3"
+checksum = "2e48a1d4a9cef1075ebe0afbf16521db6c7942e6563c136fb15676dafc5135d7"
 dependencies = [
  "float_next_after",
  "lyon_path",
@@ -2243,7 +2243,7 @@ dependencies = [
 [[package]]
 name = "macropad_protocol"
 version = "0.1.0"
-source = "git+https://github.com/arfrie22/2x2macropad_protocol#4a14589b36db7821bb3bd5a61b88940e3c78e5f1"
+source = "git+https://github.com/arfrie22/2x2macropad_protocol#791e959f3ae04db9651bd53366a61dfa2613b88f"
 dependencies = [
  "num_enum",
  "packed_struct",
@@ -3898,9 +3898,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.23.0"
+version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eab6d665857cc6ca78d6e80303a02cea7a7851e85dfbd77cbdc09bd129f1ef46"
+checksum = "7125661431c26622a80ca5051a2f936c9a678318e0351007b0cc313143024e5c"
 dependencies = [
  "autocfg",
  "bytes",
@@ -4841,12 +4841,11 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "zbus"
-version = "3.6.2"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "938ea6da98c75c2c37a86007bd17fd8e208cbec24e086108c87ece98e9edec0d"
+checksum = "379d587c0ccb632d1179cf44082653f682842f0535f0fdfaefffc34849cc855e"
 dependencies = [
  "async-broadcast",
- "async-channel",
  "async-executor",
  "async-io",
  "async-lock",
@@ -4880,9 +4879,9 @@ dependencies = [
 
 [[package]]
 name = "zbus_macros"
-version = "3.6.2"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45066039ebf3330820e495e854f8b312abb68f0a39e97972d092bd72e8bb3e8e"
+checksum = "66492a2e90c0df7190583eccb8424aa12eb7ff06edea415a4fff6688fae18cf8"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -4893,9 +4892,9 @@ dependencies = [
 
 [[package]]
 name = "zbus_names"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c737644108627748a660d038974160e0cbb62605536091bdfa28fd7f64d43c8"
+checksum = "f34f314916bd89bdb9934154627fab152f4f28acdda03e7c4c68181b214fe7e3"
 dependencies = [
  "serde",
  "static_assertions",
@@ -4904,9 +4903,9 @@ dependencies = [
 
 [[package]]
 name = "zvariant"
-version = "3.9.0"
+version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56f8c89c183461e11867ded456db252eae90874bc6769b7adbea464caa777e51"
+checksum = "576cc41e65c7f283e5460f5818073e68fb1f1631502b969ef228c2e03c862efb"
 dependencies = [
  "byteorder",
  "enumflags2",
@@ -4918,9 +4917,9 @@ dependencies = [
 
 [[package]]
 name = "zvariant_derive"
-version = "3.9.0"
+version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "155247a5d1ab55e335421c104ccd95d64f17cebbd02f50cdbc1c33385f9c4d81"
+checksum = "0fd4aafc0dee96ae7242a24249ce9babf21e1562822f03df650d4e68c20e41ed"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",

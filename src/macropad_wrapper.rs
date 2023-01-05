@@ -276,33 +276,6 @@ pub fn set_hold_speed(device: &HidDevice, speed: u32) -> Result<(), ()> {
     }
 }
 
-pub fn get_default_delay(device: &HidDevice) -> Result<u32, ()> {
-    let mut data = [0u8; 65];
-    data[1] = DataCommand::ReadConfig as u8;
-    data[2] = ConfigElements::DefaultDelay as u8;
-    let buf = send_command(device, data)?;
-
-    if data[1..3] != buf[0..2] {
-        Err(())
-    } else {
-        Ok(u32::from_le_bytes([buf[2], buf[3], buf[4], buf[5]]))
-    }
-}
-
-pub fn set_default_delay(device: &HidDevice, delay: u32) -> Result<(), ()> {
-    let mut data = [0u8; 65];
-    data[1] = DataCommand::WriteConfig as u8;
-    data[2] = ConfigElements::DefaultDelay as u8;
-    data[3..7].copy_from_slice(&delay.to_le_bytes());
-    let buf = send_command(device, data)?;
-
-    if data[1..65] != buf {
-        Err(())
-    } else {
-        Ok(())
-    }
-}
-
 pub fn get_led_base_color(device: &HidDevice) -> Result<(u8, u8, u8), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::GetLed as u8;
