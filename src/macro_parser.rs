@@ -56,8 +56,8 @@ impl MacroFrame {
 
         output.push(((command as u8) << 2) | delay_count);
 
-        for i in 0..delay_count {
-            output.push(delay[i as usize + 1]);
+        for i in 0..(delay_count + 1) {
+            output.push(delay[i as usize]);
         }
     }
 
@@ -89,23 +89,23 @@ impl MacroFrame {
                 MacroFrame::add_command(MacroCommand::KeyPress, &self.delay, &mut output);
                 output.push(*key as u8);
                 
-                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes()[1..4]);
+                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
             },
             ActionType::ConsumerPress(consumer, delay) => {
                 MacroFrame::add_command(MacroCommand::ConsumerPress, &self.delay, &mut output);
                 output.extend_from_slice(&(*consumer as u16).to_le_bytes());
                 
-                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes()[1..4]);
+                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
             },
             ActionType::String(string, delay) => {
                 MacroFrame::add_command(MacroCommand::TypeString, &self.delay, &mut output);
-                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes()[1..4]);
+                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                 output.extend_from_slice(string.as_bytes());
                 output.push(0);
             },
             ActionType::Chord(keys, delay) => {
                 MacroFrame::add_command(MacroCommand::Chord, &self.delay, &mut output);
-                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes()[1..4]);
+                output.extend_from_slice(&(delay.as_micros() as u32).to_le_bytes());
                 for key in keys {
                     output.push(*key as u8);
                 }
@@ -319,19 +319,16 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
 
     while data[offset] != MacroCommand::Empty as u8 {
         command = MacroCommand::from(data[offset] >> 2);
-        delay_bytes_count = data[offset] & 0b11;
+        delay_bytes_count = (data[offset] & 0b11) + 1;
         
         offset += 1;
 
-        if delay_bytes_count > 0 {
-            delay_bytes = [0; 4];
-            delay_bytes[1..=delay_bytes_count as usize].copy_from_slice(&data[offset..offset + delay_bytes_count as usize]);
-            offset += delay_bytes_count as usize;
-            delay = u32::from_le_bytes(delay_bytes);
-        }
+        delay_bytes = [0; 4];
+        delay_bytes[0..delay_bytes_count as usize].copy_from_slice(&data[offset..offset + delay_bytes_count as usize]);
+        offset += delay_bytes_count as usize;
+        delay = u32::from_le_bytes(delay_bytes);
 
 
-        println!("Frames: {:?}", frames);
         let frame_list = if parents.is_empty() {
             &mut frames
         } else {
@@ -339,8 +336,6 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
             let mut output = &mut frames;
             while !temp_parents.is_empty() {
                 let parent_index = temp_parents.remove(0);
-                println!("Parent: {}, remaining: {:?}, output: {:?}", parent_index, temp_parents, output);
-                println!("len output: {}", output.len());
                 match &mut output[parent_index] {
                     MacroFrame { action: ActionType::Loop(loop_frames, _, _), .. } => {
                         output = &mut *loop_frames;
@@ -438,8 +433,8 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 let key = Keyboard::from(data[offset]);
                 offset += 1;
 
-                let key_delay = u32::from_le_bytes([0, data[offset], data[offset + 1], data[offset + 2]]);
-                offset += 3;
+                let key_delay = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                offset += 4;
 
                 frame_list.push(MacroFrame {
                     action: ActionType::KeyPress(Keyboard::from(key), Duration::from_micros(key_delay as u64)),
@@ -450,8 +445,8 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 let key = Consumer::from(u16::from_le_bytes([data[offset], data[offset + 1]]));
                 offset += 2;
 
-                let key_delay = u32::from_le_bytes([0, data[offset], data[offset + 1], data[offset + 2]]);
-                offset += 3;
+                let key_delay = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                offset += 4;
 
                 frame_list.push(MacroFrame {
                     action: ActionType::ConsumerPress(Consumer::from(key), Duration::from_micros(key_delay as u64)),
@@ -459,8 +454,8 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 });
             },
             MacroCommand::TypeString => {
-                let key_delay = u32::from_le_bytes([0, data[offset], data[offset + 1], data[offset + 2]]);
-                offset += 3;
+                let key_delay = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                offset += 4;
 
                 let mut string = String::new();
 
@@ -477,8 +472,8 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
                 });
             },
             MacroCommand::Chord => {
-                let key_delay = u32::from_le_bytes([0, data[offset], data[offset + 1], data[offset + 2]]);
-                offset += 3;
+                let key_delay = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                offset += 4;
 
                 let mut keys = Vec::new();
 
