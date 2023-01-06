@@ -44,12 +44,16 @@ impl MacroFrame {
     fn add_command(command: MacroCommand, delay: &Duration, output: &mut Vec<u8>) {
         let delay = (delay.as_micros() as u32).to_le_bytes();
     
-        let delay_count = if delay[1] == 0 {
-            0
-        } else if delay[2] == 0 {
-            1
-        } else if delay[3] == 0 {
-            2
+        let delay_count = if delay[3] == 0 {
+            if delay[2] == 0 {
+                if delay[1] == 0 {
+                    0
+                } else {
+                    1
+                }
+            } else {
+                2
+            }
         } else {
             3
         };
@@ -927,7 +931,7 @@ impl Macro {
                 return Err(());
             }
 
-            data[i..i + packed.len()].copy_from_slice(&packed);
+            data[i..i + packed.len()].copy_from_slice(packed.as_slice());
             i += packed.len();
         }
 
