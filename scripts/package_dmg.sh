@@ -9,7 +9,7 @@ cargo bundle
 
 create-dmg \
   --volname "Macropad Configurator Installer" \
-  --background "assets/installer/Background.png" \
+  --background "assets/installer/Background.tiff" \
   --window-pos 200 120 \
   --window-size 800 400 \
   --icon-size 100 \
