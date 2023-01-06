@@ -27,7 +27,7 @@ osx_url_schemes = ["io.github.arfrie22.macropad_configurator"]
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 device_query = "1.1.1"
-iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg", "canvas"] }
+iced = { version = "0.6", default-features = false, features = ["glow", "tokio", "image", "svg", "canvas", "image_rs"] }
 iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = [
     "color_picker",
     "colors",
@@ -58,3 +58,4 @@ async-std = "1.12.0"
 num_enum = { version = "0.5.7"}
 iced_wgpu = "0.7.0"
 iced_graphics = "0.5.0"
+image = "0.24.5"

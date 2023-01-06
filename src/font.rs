@@ -1,8 +1,10 @@
 use iced::Font;
 
+pub const ROBOTO_BYTES: &'static[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
+
 pub const ROBOTO: Font = iced::Font::External {
     name: "Roboto",
-    bytes: include_bytes!("../assets/fonts/Roboto-Regular.ttf"),
+    bytes: ROBOTO_BYTES,
 };
 
 pub const ROBOTO_BOLD: Font = iced::Font::External {

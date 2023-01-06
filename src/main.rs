@@ -13,7 +13,7 @@ use iced::{Alignment, Application, Command, Element, Length, Settings, Subscript
 use iced_aw::style::{TabBarStyles, BadgeStyles};
 use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs, Badge};
 use iced_native::widget::{space, checkbox};
-use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO};
+use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO_BYTES};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
 use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction};
@@ -35,8 +35,10 @@ const TAB_PADDING: u16 = 16;
 pub fn main() -> iced::Result {
     Configurator::run(Settings {
         antialiasing: true,
+        default_font: Some(ROBOTO_BYTES),
         window: window::Settings {
             position: window::Position::Centered,
+            icon: Some(iced::window::Icon::from_file_data(include_bytes!("../assets/icon/png/MacropadConfigurator_512@2x.png"), Some(image::ImageFormat::Png)).unwrap()),
             ..window::Settings::default()
         },
         ..Settings::default()
@@ -653,12 +655,10 @@ impl Application for Configurator {
                 // TODO: Add ability to flash firmware
                 let message = column![
                     text("Disconnected")
-                        .font(ROBOTO)
                         .size(60)
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
                     text("Connect your macropad to get started")
-                        .font(ROBOTO)
                         .size(30)
                         .width(Length::Fill)
                         .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -679,14 +679,13 @@ impl Application for Configurator {
                 .tab_bar_style(TabBarStyles::Purple)
                 .icon_font(ICON_FONT)
                 .tab_bar_position(iced_aw::TabBarPosition::Bottom)
-                .text_font(ROBOTO)
                 .text_size(20)
                 .into(),
             State::Connected(_, Page::ModifyKey(i)) => {                
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
                     macropad_protocol::data_protocol::KeyMode::MacroMode => {
                         column![container(column![
-                            text("Key Mode").font(ROBOTO).size(30),
+                            text("Key Mode").size(30),
                             row![
                                 button("Tap Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
@@ -711,7 +710,7 @@ impl Application for Configurator {
                     }
                     macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
                         column![container(column![
-                            text("Key Mode").font(ROBOTO).size(30),
+                            text("Key Mode").size(30),
                             row![
                                 button("Tap Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
@@ -734,7 +733,7 @@ impl Application for Configurator {
                     macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
                         column![
                             container(column![
-                                text("Key").font(ROBOTO).size(30),
+                                text("Key").size(30),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
                                     Some(self.key_tab.key_configs[*i].keyboard_data.into()),
@@ -748,7 +747,7 @@ impl Application for Configurator {
                                 left: 0,
                             }),
                             container(column![
-                                text("Key Color").font(ROBOTO).size(30),
+                                text("Key Color").size(30),
                                 ColorPicker::new(
                                     self.key_tab.show_picker,
                                     Color::from_rgb8(
@@ -772,7 +771,7 @@ impl Application for Configurator {
                     macropad_protocol::data_protocol::KeyMode::ConsumerMode => {
                         column![
                             container(column![
-                                text("Consumer").font(ROBOTO).size(30),
+                                text("Consumer").size(30),
                                 pick_list(
                                     &type_wrapper::ConsumerWrapper::KEYS[..],
                                     Some(self.key_tab.key_configs[*i].consumer_data.into()),
@@ -786,7 +785,7 @@ impl Application for Configurator {
                                 left: 0,
                             }),
                             container(column![
-                                text("Key Color").font(ROBOTO).size(30),
+                                text("Key Color").size(30),
                                 ColorPicker::new(
                                     self.key_tab.show_picker,
                                     Color::from_rgb8(
@@ -820,7 +819,7 @@ impl Application for Configurator {
                         )
                         .align_x(iced::alignment::Horizontal::Left),
                         text(format!("Modify Key {}", i))
-                            .font(ROBOTO)
+                            
                             .size(60)
                             .width(Length::Fill)
                             .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -829,7 +828,7 @@ impl Application for Configurator {
                     .align_y(alignment::Vertical::Top),
                     container(column![
                         container(column![
-                            text("Key Mode").font(ROBOTO).size(30),
+                            text("Key Mode").size(30),
                             row![
                                 radio(
                                     "Macro Mode",
@@ -888,13 +887,13 @@ impl Application for Configurator {
                 
                 let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
                     let action_delay = container(column![
-                        text("Action Delay (ms)").font(ROBOTO).size(30),
+                        text("Action Delay (ms)").size(30),
                         Space::with_height(Length::Units(10)),
                         text_input(
                             0.to_string().as_str(),
                             self.key_tab.action_option_controls.delay_text.as_str(),
                             Message::MacroActionDelayChangedText
-                        ).font(ROBOTO),
+                        ),
                     ]);
 
 
@@ -910,7 +909,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("LED Color").font(ROBOTO).size(30),
+                                text("LED Color").size(30),
                                 ColorPicker::new(
                                     self.key_tab.action_option_controls.show_color_picker,
                                     Color::from_rgb8(
@@ -935,7 +934,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Key").font(ROBOTO).size(30),
+                                text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
@@ -950,7 +949,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Key").font(ROBOTO).size(30),
+                                text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
@@ -965,7 +964,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Key").font(ROBOTO).size(30),
+                                text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
@@ -975,13 +974,13 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
-                                ).font(ROBOTO),
+                                ),
                             ]
                         },
                         macro_editor::ActionOptions::ConsumerPress(key, delay) => {
@@ -990,7 +989,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Consumer").font(ROBOTO).size(30),
+                                text("Consumer").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
                                     &type_wrapper::ConsumerWrapper::KEYS[..],
@@ -1000,13 +999,13 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
-                                ).font(ROBOTO),
+                                ),
                             ]
                         },
                         macro_editor::ActionOptions::String(string, delay) => {
@@ -1015,23 +1014,23 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Text").font(ROBOTO).size(30),
+                                text("Text").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     string.as_str(),
                                     self.key_tab.action_option_controls.string_text.as_str(),
                                     Message::MacroActionStringChangedText
-                                ).font(ROBOTO),
+                                ),
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Letter Delay (ms)").font(ROBOTO).size(30),
+                                text("Letter Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
-                                ).font(ROBOTO),
+                                ),
                             ]
                         },
                         macro_editor::ActionOptions::Chord(chord, delay) => {
@@ -1041,13 +1040,13 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Keys").font(ROBOTO).size(30),
+                                text("Keys").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     chord.string.as_str(),
                                     self.key_tab.action_option_controls.chord_text.as_str(),
                                     Message::MacroActionChordChangedText
-                                ).font(ROBOTO),
+                                ),
 
                                 Space::with_height(Length::Units(10)),
                                 checkbox(
@@ -1076,13 +1075,13 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
-                                ).font(ROBOTO),
+                                ),
                             ]
                         },
                         macro_editor::ActionOptions::Loop(delay, count) => {
@@ -1091,36 +1090,36 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").font(ROBOTO).size(30),
+                                text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     0.to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
-                                ).font(ROBOTO),
+                                ),
 
                                 Space::with_height(Length::Units(20)),
                                 
 
-                                text("Loop Count").font(ROBOTO).size(30),
+                                text("Loop Count").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     count.to_string().as_str(),
                                     self.key_tab.action_option_controls.loop_count_text.as_str(),
                                     Message::MacroActionLoopCountChangedText
-                                ).font(ROBOTO),
+                                ),
                             ]
                         },
                     }
                 } else {
                     column![
-                        text("Nothing selected").font(ROBOTO).size(30),
+                        text("Nothing selected").size(30),
                     ]
                 };
 
                 let macro_controls = container(column![
                     row![
-                        text("Macro Size:").font(ROBOTO).size(30),
+                        text("Macro Size:").size(30),
                         Space::with_width(Length::Units(10)),
                         Badge::new(Text::new(format!("{}/4092", macro_size))).style(if macro_size > 4092 {
                                 BadgeStyles::Danger
@@ -1158,7 +1157,7 @@ impl Application for Configurator {
                         macro_parser::MacroType::DoubleTap => "Double Tap",
                         macro_parser::MacroType::TapHold => "Tap and Hold",
                     }, i))
-                        .font(ROBOTO)
+                        
                         .size(60),
                     row![
                         self.key_tab
@@ -1422,7 +1421,7 @@ impl Tab for KeyTab {
     fn content(&self) -> Element<'_, Self::Message> {
         let message = column![
             text("Select a key to modify")
-                .font(ROBOTO)
+                
                 .size(60)
                 .width(Length::Fill)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -1573,7 +1572,7 @@ impl Tab for LedTab {
         let message = column![row![
             column![
                 container(column![
-                    text("Effect").font(ROBOTO).size(30),
+                    text("Effect").size(30),
                     pick_list(
                         &macropad_configurator::macropad_wrapper::EFFECTS[..],
                         Some(self.config.effect),
@@ -1587,7 +1586,7 @@ impl Tab for LedTab {
                     left: 0,
                 }),
                 container(column![
-                    text("Period").font(ROBOTO).size(30),
+                    text("Period").size(30),
                     row![
                         slider(
                             -50.0..=50.0,
@@ -1601,7 +1600,7 @@ impl Tab for LedTab {
                             self.period_text.as_str(),
                             Message::LedPeriodChangedText
                         )
-                        .font(ROBOTO)
+                        
                         .width(Length::Units(50)),
                     ],
                 ])
@@ -1612,7 +1611,7 @@ impl Tab for LedTab {
                     left: 0,
                 }),
                 container(column![
-                    text("Brightness").font(ROBOTO).size(30),
+                    text("Brightness").size(30),
                     row![
                         slider(
                             0.0..=255.0,
@@ -1626,7 +1625,7 @@ impl Tab for LedTab {
                             self.brightness_text.as_str(),
                             Message::LedBrightnessChangedText
                         )
-                        .font(ROBOTO)
+                        
                         .width(Length::Units(50)),
                     ],
                 ])
@@ -1637,7 +1636,7 @@ impl Tab for LedTab {
                     left: 0,
                 }),
                 container(column![
-                    text("Base Color").font(ROBOTO).size(30),
+                    text("Base Color").size(30),
                     ColorPicker::new(
                         self.show_picker,
                         Color::from_rgb8(
@@ -1784,13 +1783,13 @@ impl Tab for SettingsTab {
             .align_y(alignment::Vertical::Top),
             container(column![
                 container(column![
-                    text("Press Time (ms)").font(ROBOTO).size(30),
+                    text("Press Time (ms)").size(30),
                     text_input(
                         (self.config.tap_speed / 1000).to_string().as_str(),
                         self.press_time_text.as_str(),
                         Message::PressTimeChangedText
                     )
-                    .font(ROBOTO)
+                    
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
@@ -1800,13 +1799,13 @@ impl Tab for SettingsTab {
                     left: 0,
                 }),
                 container(column![
-                    text("Hold Time (ms)").font(ROBOTO).size(30),
+                    text("Hold Time (ms)").size(30),
                     text_input(
                         (self.config.hold_speed / 1000).to_string().as_str(),
                         self.hold_time_text.as_str(),
                         Message::HoldTimeChangedText
                     )
-                    .font(ROBOTO)
+                    
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
