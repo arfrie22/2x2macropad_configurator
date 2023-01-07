@@ -9,7 +9,7 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  linux:
+  linux-release:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -44,7 +44,7 @@ jobs:
       with:
         files: ${{github.workspace}}/target/release/bundle/deb/*.deb
 
-  windows:
+  windows-release:
     runs-on: windows-latest
     steps:
     - name: Checkout
@@ -75,7 +75,7 @@ jobs:
       with:
         files: ${{github.workspace}}\target\release\macropad_configurator.exe
 
-  mac:
+  mac-release:
     runs-on: macos-latest
     steps:
     - name: Checkout
