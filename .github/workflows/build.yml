@@ -17,8 +17,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
-    # - name: Install Dependencies
-    #   run: 
+    - name: Install Dependencies
+      run: sudo apt-get install libudev-dev pkg-config
 
     - name: Setup Rust
       run: |
@@ -32,7 +32,7 @@ jobs:
     - name: Build and Bundle
       run: cargo bundle
     
-    - name: Upload Firmware
+    - name: Upload Linux
       uses: actions/upload-artifact@v3
       with:
         name: Linux
@@ -51,19 +51,18 @@ jobs:
       run: |
         rustup self update
         rustup update stable
-        cargo install cargo-bundle
 
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
 
-    - name: Build and Bundle
-      run: cargo bundle
+    - name: Build
+      run: cargo build
     
-    - name: Upload Firmware
+    - name: Upload Windows
       uses: actions/upload-artifact@v3
       with:
         name: Windows
-        path: ${{github.workspace}}/target/debug/bundle/msi/*.msi
+        path: ${{github.workspace}}/target/debug/*.exe
 
   mac:
     runs-on: macos-latest
@@ -91,7 +90,7 @@ jobs:
         find . -type d -print0 -maxdepth 1 | xargs -0 -I {} zip -r "{}.zip" {}
 
     
-    - name: Upload Firmware
+    - name: Upload MacOS
       uses: actions/upload-artifact@v3
       with:
         name: MacOS
