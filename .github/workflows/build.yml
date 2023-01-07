@@ -1,0 +1,99 @@
+name: Compile debug build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  BUILD_TYPE: Debug
+
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # - name: Install Dependencies
+    #   run: 
+
+    - name: Setup Rust
+      run: |
+        rustup self update
+        rustup update stable
+        cargo install cargo-bundle
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build and Bundle
+      run: cargo bundle
+    
+    - name: Upload Firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: Linux
+        path: ${{github.workspace}}/target/debug/bundle/deb/*.deb
+
+  windows:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # - name: Install Dependencies
+    #   run: 
+
+    - name: Setup Rust
+      run: |
+        rustup self update
+        rustup update stable
+        cargo install cargo-bundle
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build and Bundle
+      run: cargo bundle
+    
+    - name: Upload Firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: Windows
+        path: ${{github.workspace}}/target/debug/bundle/msi/*.msi
+
+  mac:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # - name: Install Dependencies
+      # run: 
+
+    - name: Setup Rust
+      run: |
+        rustup self update
+        rustup update stable
+        cargo install cargo-bundle
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build and Bundle
+      run: cargo bundle
+
+    - name: Zip App
+      run: |
+        cd target/debug/bundle/osx
+        find . -type d -print0 -maxdepth 1 | xargs -0 -I {} zip -r "{}.zip" {}
+
+    
+    - name: Upload Firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: MacOS
+        path: ${{github.workspace}}/target/debug/bundle/osx/*.app.zip
