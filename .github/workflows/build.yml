@@ -70,8 +70,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
-    # - name: Install Dependencies
-      # run: 
+    - name: Install Dependencies
+      run: brew install create-dmg
 
     - name: Setup Rust
       run: |
@@ -82,16 +82,17 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Build and Bundle
-      run: cargo bundle
+      run: ${{github.workspace}}/scripts/package_dmg.sh
+      # run: cargo bundle
 
-    - name: Zip App
-      run: |
-        cd target/debug/bundle/osx
-        find . -type d -print0 -maxdepth 1 | xargs -0 -I {} zip -r "{}.zip" {}
-
+    # - name: Zip App
+    #   run: |
+    #     cd target/debug/bundle/osx
+    #     find . -type d -print0 -maxdepth 1 | xargs -0 -I {} zip -r "{}.zip" {}
     
     - name: Upload MacOS
       uses: actions/upload-artifact@v3
       with:
         name: MacOS
-        path: ${{github.workspace}}/target/debug/bundle/osx/*.app.zip
+        # path: ${{github.workspace}}/target/debug/bundle/osx/*.app.zip
+        path: ${{github.workspace}}/*.dmg
