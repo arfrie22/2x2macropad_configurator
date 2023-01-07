@@ -1,12 +1,5 @@
 [[ -f Macropad-Configurator-Installer.dmg ]] && rm Macropad-Configurator-Installer.dmg
 
-# if current dir ends with "scripts" cd up one dir
-[[ $PWD =~ scripts$ ]] &&
-
-echo "cd .." && cd ..
-
-cargo bundle
-
 create-dmg \
   --volname "Macropad Configurator Installer" \
   --background "assets/installer/Background.tiff" \
