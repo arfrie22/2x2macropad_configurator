@@ -2,7 +2,7 @@
 name = "macropad_configurator"
 version = "0.5.1"
 edition = "2021"
-description = "A"
+description = "A programmer for the 2x2 Macropad."
 default-run = "macropad_configurator"
 
 [package.metadata.bundle]
