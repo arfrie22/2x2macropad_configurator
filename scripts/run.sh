@@ -1,2 +1,3 @@
 cargo bundle
-./scripts/package_dmg.sh
+
+./scripts/package_dmg.sh debug

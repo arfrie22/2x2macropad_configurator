@@ -34,13 +34,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: Linux
-        path: ${{github.workspace}}/target/debug/bundle/deb/*.deb
+        path: ${{github.workspace}}/target/release/bundle/deb/*.deb
 
     - name: Add Linux to Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: ${{github.workspace}}/target/debug/bundle/deb/*.deb
+        files: ${{github.workspace}}/target/release/bundle/deb/*.deb
 
   windows:
     runs-on: windows-latest
@@ -63,13 +63,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: Windows
-        path: ${{github.workspace}}/target/debug/*.exe
+        path: ${{github.workspace}}/target/release/*.exe
     
     - name: Add Windows to Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: ${{github.workspace}}/target/debug/*.exe
+        files: ${{github.workspace}}/target/release/*.exe
 
   mac:
     runs-on: macos-latest
@@ -91,7 +91,7 @@ jobs:
     - name: Build and Bundle
       run: |
         cargo bundle --release
-        ${{github.workspace}}/scripts/package_dmg.sh
+        ${{github.workspace}}/scripts/package_dmg.sh release
     
     - name: Upload MacOS
       uses: actions/upload-artifact@v3

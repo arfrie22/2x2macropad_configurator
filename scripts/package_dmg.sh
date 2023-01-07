@@ -10,4 +10,4 @@ create-dmg \
   --hide-extension "Macropad Configurator.app" \
   --app-drop-link 600 185 \
   "Macropad-Configurator-Installer.dmg" \
-  "target/debug/bundle/osx/"
+  "target/$1/bundle/osx/"
