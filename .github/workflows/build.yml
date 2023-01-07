@@ -76,7 +76,6 @@ jobs:
 
     - name: Setup Rust
       run: |
-        rustup self update
         rustup update stable
         cargo install cargo-bundle
 
