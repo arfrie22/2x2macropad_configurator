@@ -413,7 +413,7 @@ impl Application for Configurator {
                         self.key_tab.editor.request_redraw();
                     }
                 } else if text == "" {
-                    self.settings_tab.press_time_text = text;
+                    self.key_tab.action_option_controls.delay_text = text;
                 }
             },
             Message::MacroActionPickColor => {
@@ -476,37 +476,39 @@ impl Application for Configurator {
             }
             Message::MacroActionSubDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
-                    if let Some(action) = self.key_tab.selected_action.as_mut() {
-                        match &mut action.action_options {
-                            macro_editor::ActionOptions::KeyPress(_, delay) => {
-                                *delay = Duration::from_millis(ms as u64);
-                                self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
-                            macro_editor::ActionOptions::ConsumerPress(_, delay) => {
-                                *delay = Duration::from_millis(ms as u64);
-                                self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
-                            macro_editor::ActionOptions::String(_, delay) => {
-                                *delay = Duration::from_millis(ms as u64);
-                                self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
-                            macro_editor::ActionOptions::Chord(_, delay) => {
-                                *delay = Duration::from_millis(ms as u64);
-                                self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
-                            macro_editor::ActionOptions::Loop(delay, _) => {
-                                *delay = Duration::from_millis(ms as u64);
-                                self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
+                    if ms > 0 {
+                        if let Some(action) = self.key_tab.selected_action.as_mut() {
+                            match &mut action.action_options {
+                                macro_editor::ActionOptions::KeyPress(_, delay) => {
+                                    *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
+                                },
+                                macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                                    *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
+                                },
+                                macro_editor::ActionOptions::String(_, delay) => {
+                                    *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
+                                },
+                                macro_editor::ActionOptions::Chord(_, delay) => {
+                                    *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
+                                },
+                                macro_editor::ActionOptions::Loop(delay, _) => {
+                                    *delay = Duration::from_millis(ms as u64);
+                                    self.key_tab.action_option_controls.sub_delay_text = text;
+                                },
 
-                            _ => unreachable!(),
+                                _ => unreachable!(),
+                            }
+
+                            action.update_action(&self.key_tab.editor_actions.as_slice());
+                            self.key_tab.editor.request_redraw();
                         }
-
-                        action.update_action(&self.key_tab.editor_actions.as_slice());
-                        self.key_tab.editor.request_redraw();
                     }
                 } else if text == "" {
-                    self.settings_tab.press_time_text = text;
+                    self.key_tab.action_option_controls.sub_delay_text = text;
                 }
             },
             Message::MacroActionStringChangedText(content) => {
@@ -890,7 +892,7 @@ impl Application for Configurator {
                         text("Action Delay (ms)").size(30),
                         Space::with_height(Length::Units(10)),
                         text_input(
-                            0.to_string().as_str(),
+                            action.delay.as_millis().to_string().as_str(),
                             self.key_tab.action_option_controls.delay_text.as_str(),
                             Message::MacroActionDelayChangedText
                         ),
@@ -977,7 +979,7 @@ impl Application for Configurator {
                                 text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
-                                    0.to_string().as_str(),
+                                    delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
@@ -1002,7 +1004,7 @@ impl Application for Configurator {
                                 text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
-                                    0.to_string().as_str(),
+                                    delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
@@ -1027,7 +1029,7 @@ impl Application for Configurator {
                                 text("Letter Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
-                                    0.to_string().as_str(),
+                                    delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
@@ -1078,7 +1080,7 @@ impl Application for Configurator {
                                 text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
-                                    0.to_string().as_str(),
+                                    delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
@@ -1093,7 +1095,7 @@ impl Application for Configurator {
                                 text("Press Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
-                                    0.to_string().as_str(),
+                                    delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),

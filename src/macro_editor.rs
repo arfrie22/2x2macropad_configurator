@@ -973,10 +973,10 @@ impl Action {
             (ActionType::ClearLed, "Clear LED"),
             (ActionType::KeyDown(Keyboard::NoEventIndicated), "Key Down"),
             (ActionType::KeyUp(Keyboard::NoEventIndicated), "Key Up"),
-            (ActionType::KeyPress(Keyboard::NoEventIndicated, Duration::ZERO), "Key Press"),
-            (ActionType::ConsumerPress(Consumer::Unassigned, Duration::ZERO), "Consumer Press"),
-            (ActionType::String(String::new(), Duration::ZERO), "String"),
-            (ActionType::Chord(vec![], Duration::ZERO), "Chord"),
+            (ActionType::KeyPress(Keyboard::NoEventIndicated, Duration::from_millis(100)), "Key Press"),
+            (ActionType::ConsumerPress(Consumer::Unassigned, Duration::from_millis(100)), "Consumer Press"),
+            (ActionType::String(String::new(), Duration::from_millis(100)), "String"),
+            (ActionType::Chord(vec![], Duration::from_millis(100)), "Chord"),
             (ActionType::Loop(vec![], Duration::ZERO, 1), "Loop"),
         ]
     };
