@@ -905,7 +905,7 @@ impl Application for Configurator {
                 
                 let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
                     let action_delay = container(column![
-                        text("Action Delay (ms)").size(30),
+                        text("Post Action Delay (ms)").size(30),
                         Space::with_height(Length::Units(10)),
                         text_input(
                             action.delay.as_millis().to_string().as_str(),
@@ -992,7 +992,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").size(30),
+                                text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
@@ -1017,7 +1017,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").size(30),
+                                text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
@@ -1093,7 +1093,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").size(30),
+                                text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
@@ -1108,7 +1108,7 @@ impl Application for Configurator {
 
                                 Space::with_height(Length::Units(20)),
 
-                                text("Press Delay (ms)").size(30),
+                                text("Per Loop Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
