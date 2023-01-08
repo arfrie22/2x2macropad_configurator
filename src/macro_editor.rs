@@ -1024,7 +1024,7 @@ impl Action {
             if rect.contains(point) {
                 return Some(MacroFrame {
                     action: action.clone(),
-                    delay: Duration::ZERO,
+                    delay: Duration::from_millis(100),
                 });
             }
         }

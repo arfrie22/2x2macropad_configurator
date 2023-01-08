@@ -16,7 +16,7 @@ use iced_native::widget::{space, checkbox};
 use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO_BYTES};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction};
+use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction, ActionOptions};
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
 use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
 use macropad_configurator::{
@@ -406,8 +406,18 @@ impl Application for Configurator {
             Message::MacroActionDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
                     if let Some(action) = self.key_tab.selected_action.as_mut() {
-                        self.key_tab.action_option_controls.delay_text = text;
-                        action.delay = Duration::from_millis(ms as u64);
+                        match &action.action_options {
+                            ActionOptions::Empty => {
+                                if ms > 0 {
+                                    self.key_tab.action_option_controls.delay_text = text;
+                                    action.delay = Duration::from_millis(ms as u64);
+                                }
+                            },
+                            _ => {
+                                self.key_tab.action_option_controls.delay_text = text;
+                                action.delay = Duration::from_millis(ms as u64);
+                            },
+                        }
 
                         action.update_action(&self.key_tab.editor_actions.as_slice());
                         self.key_tab.editor.request_redraw();
@@ -476,36 +486,42 @@ impl Application for Configurator {
             }
             Message::MacroActionSubDelayChangedText(text) => {
                 if let Ok(ms) = text.parse::<u32>() {
-                    if ms > 0 {
-                        if let Some(action) = self.key_tab.selected_action.as_mut() {
-                            match &mut action.action_options {
-                                macro_editor::ActionOptions::KeyPress(_, delay) => {
+                    if let Some(action) = self.key_tab.selected_action.as_mut() {
+                        match &mut action.action_options {
+                            macro_editor::ActionOptions::KeyPress(_, delay) => {
+                                if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
-                                },
-                                macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                                }
+                            },
+                            macro_editor::ActionOptions::ConsumerPress(_, delay) => {
+                                if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
-                                },
-                                macro_editor::ActionOptions::String(_, delay) => {
+                                }
+                            },
+                            macro_editor::ActionOptions::String(_, delay) => {
+                                if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
-                                },
-                                macro_editor::ActionOptions::Chord(_, delay) => {
+                                }
+                            },
+                            macro_editor::ActionOptions::Chord(_, delay) => {
+                                if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
-                                },
-                                macro_editor::ActionOptions::Loop(delay, _) => {
-                                    *delay = Duration::from_millis(ms as u64);
-                                    self.key_tab.action_option_controls.sub_delay_text = text;
-                                },
+                                }
+                            },
+                            macro_editor::ActionOptions::Loop(delay, _) => {
+                                *delay = Duration::from_millis(ms as u64);
+                                self.key_tab.action_option_controls.sub_delay_text = text;
+                            },
 
-                                _ => unreachable!(),
-                            }
-
-                            action.update_action(&self.key_tab.editor_actions.as_slice());
-                            self.key_tab.editor.request_redraw();
+                            _ => unreachable!(),
                         }
+
+                        action.update_action(&self.key_tab.editor_actions.as_slice());
+                        self.key_tab.editor.request_redraw();
                     }
                 } else if text == "" {
                     self.key_tab.action_option_controls.sub_delay_text = text;
