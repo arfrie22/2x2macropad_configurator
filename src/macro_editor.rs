@@ -555,9 +555,11 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                 );
                             } else {
                                 state.drag_state = None;
+                                let mut index = action.index_from(self.actions).unwrap();
+                                index.index += 1;
                                 return (
                                     event::Status::Captured,
-                                    Some(Message::AddFrame(MacroFrame::from(action.clone()), action.index_from(self.actions).unwrap())),
+                                    Some(Message::AddFrame(MacroFrame::from(action.clone()), index)),
                                 );
                             }
                         }
