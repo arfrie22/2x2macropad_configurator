@@ -347,6 +347,7 @@ pub enum Message {
     ReleaseGrab,
     DragStart,
     Scroll(Vector),
+    FrameClick
 }
 
 #[derive(Default, Debug)]
@@ -354,6 +355,7 @@ pub struct State {
     cache: canvas::Cache,
     scroll_offset: Vector,
     add_menu_open: bool,
+    selected_action: Option<Action>,
 }
 
 const ACTION_SIZE: Size = Size::new(600.0, 50.0);
@@ -371,6 +373,10 @@ impl State {
 
     pub fn close_add_menu(&mut self) {
         self.add_menu_open = false;
+    }
+
+    pub fn select(&mut self, select: Option<Action>) {
+        self.selected_action = select;
     }
 
     pub fn view<'a>(&'a self, actions: &'a [Action]) -> Element<'a, Message> {
@@ -449,8 +455,16 @@ impl<'a> Editor<'a> {
     }
 }
 
+#[derive(Default)]
+struct EditorState {
+    drag_state: Option<Drag>, 
+    // select_state: Option<Action>, 
+    add_button_state: bool,
+    close_button_state: Option<Action>,
+}
+
 impl<'a> canvas::Program<Message> for Editor<'a> {
-    type State = (Option<Drag>, Option<Action>, bool);
+    type State = EditorState;
 
     fn update(
         &self,
@@ -484,12 +498,12 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                         );
                         Some(Message::Scroll(scroll_offset))
                     }
-                    mouse::Event::ButtonPressed(mouse::Button::Left) => match *state {
-                        (None, _, _) => {
+                    mouse::Event::ButtonPressed(mouse::Button::Left) => match state.drag_state {
+                        None => {
                             if Action::on_add_button(&bounds, cursor_position) {
-                                state.2 = true;
+                                state.add_button_state = true;
                             }  else if self.state.add_menu_open && Action::get_add_frame(&bounds, cursor_position).is_some() {
-                                state.2 = false;
+                                state.add_button_state = false;
                                 return (event::Status::Captured, Some(Message::AddFrame(Action::get_add_frame(&bounds, cursor_position).unwrap(), Index { index: self.actions.len(), parents: Vec::new() })));
                             } else if let Some((action, offset)) = Action::get_offset(
                                 self.actions,
@@ -497,7 +511,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                 cursor_position,
                             ) {
                                 if action.on_close_button(offset) {
-                                    *state = (None, None, state.2);
+                                    state.drag_state = None;
                                     return (
                                         event::Status::Captured,
                                         Some(Message::RemoveFrame(
@@ -506,31 +520,53 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                     );
                                 }
 
-                                *state = (
-                                    Some(Drag {
+                                state.drag_state = Some(Drag {
                                         action,
                                         drag_offset: offset,
                                         moved: false,
                                         to: cursor_position,
                                         moving: None,
-                                    }),
-                                    None,
-                                    state.2,
-                                );
+                                    });
 
-                                return (event::Status::Captured, None);
+                                return (event::Status::Captured, Some(Message::FrameClick));
                             }
-
-                            if state.1.take().is_some() {
+                            
+                            if self.state.selected_action.is_some() {
                                 return (event::Status::Captured, Some(Message::SelectFrame(None)));
-                            }
+                            } 
+
                             None
                         }
                         _ => None,
                     },
+                    mouse::Event::ButtonPressed(mouse::Button::Middle) => {
+                        if let Some((action, offset)) = Action::get_offset(
+                            self.actions,
+                            self.state.scroll_offset,
+                            cursor_position,
+                        ) {
+                            if action.on_close_button(offset) {
+                                state.drag_state = None;
+                                return (
+                                    event::Status::Captured,
+                                    Some(Message::RemoveFrame(
+                                        action.index_from(self.actions).unwrap(),
+                                    )),
+                                );
+                            } else {
+                                state.drag_state = None;
+                                return (
+                                    event::Status::Captured,
+                                    Some(Message::AddFrame(MacroFrame::from(action.clone()), action.index_from(self.actions).unwrap())),
+                                );
+                            }
+                        }
+
+                        None
+                    }
                     mouse::Event::CursorMoved { .. } => {
                         if let Some(cursor_position) = cursor.position_in(&bounds) {
-                            match state.0.take() {
+                            match state.drag_state.take() {
                                 Some(Drag {
                                     action,
                                     drag_offset,
@@ -541,17 +577,13 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                                 }) => {
                                     if !moved {
                                         if cursor_position.distance(to) > MOVE_THRESHOLD {
-                                            *state = (
-                                                Some(Drag {
-                                                    action,
-                                                    drag_offset,
-                                                    moved: true,
-                                                    to: cursor_position,
-                                                    moving: None,
-                                                }),
-                                                None,
-                                                state.2,
-                                            );
+                                            state.drag_state = Some(Drag {
+                                                action,
+                                                drag_offset,
+                                                moved: true,
+                                                to: cursor_position,
+                                                moving: None,
+                                            });
                                             return (
                                                 event::Status::Captured,
                                                 Some(Message::DragStart),
@@ -577,33 +609,25 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
 
                                                 let message =
                                                     Message::MoveFrame(from_index, index.clone());
-                                                *state = (
-                                                    Some(Drag {
+                                                state.drag_state = Some(Drag {
                                                         action,
                                                         drag_offset,
                                                         moved,
                                                         to: cursor_position,
                                                         moving: Some(index),
-                                                    }),
-                                                    None,
-                                                    state.2,
-                                                );
+                                                });
                                                 return (event::Status::Captured, Some(message));
                                             }
                                         }
                                     }
 
-                                    *state = (
-                                        Some(Drag {
-                                            action,
-                                            drag_offset,
-                                            moved,
-                                            to,
-                                            moving,
-                                        }),
-                                        None,
-                                        state.2,
-                                    );
+                                    state.drag_state = Some(Drag {
+                                        action,
+                                        drag_offset,
+                                        moved,
+                                        to,
+                                        moving,
+                                    });
 
                                     None
                                 }
@@ -613,12 +637,12 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                             None
                         }
                     }
-                    mouse::Event::ButtonReleased(mouse::Button::Left) => match state.0.take() {
+                    mouse::Event::ButtonReleased(mouse::Button::Left) => match state.drag_state.take() {
                         Some(Drag { action, moved, .. }) => {
                             if !moved {
                                 let selected =
                                     Some(SelectedAction::from_action(&action, self.actions));
-                                *state = (None, Some(action), state.2);
+                                state.drag_state = None;
                                 return (
                                     event::Status::Captured,
                                     Some(Message::SelectFrame(selected)),
@@ -628,8 +652,8 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                             return (event::Status::Captured, Some(Message::ReleaseGrab));
                         }
                         None => {
-                            if state.2 && Action::on_add_button(&bounds, cursor_position) {
-                                state.2 = false;
+                            if state.add_button_state && Action::on_add_button(&bounds, cursor_position) {
+                                state.add_button_state = false;
                                 return (
                                     event::Status::Captured,
                                     Some(Message::OpenAddMenu),
@@ -661,8 +685,8 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 frame,
                 theme,
                 self.state.scroll_offset,
-                &state.1,
-                &state.0,
+                &self.state.selected_action,
+                &state.drag_state,
             );
 
             if self.state.add_menu_open {
@@ -686,7 +710,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
                 bounds.width - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
                 bounds.height - ADD_BUTTON_RADIUS - ADD_BUTTON_PADDING,
             ), ADD_BUTTON_RADIUS), 
-            if state.2 {
+            if state.add_button_state {
                 theme.extended_palette().primary.strong.color
             } else if let Some(cursor_position) = cursor.position_in(&bounds) {
                 if Action::on_add_button(&bounds, cursor_position) {
@@ -718,7 +742,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
             frame.into_geometry()
         };
 
-        if let Some(drag) = state.0.as_ref() {
+        if let Some(drag) = state.drag_state.as_ref() {
             let drag_action = drag.draw(&theme, bounds, cursor);
             let placeholder = {
                 let mut frame = Frame::new(bounds.size());
@@ -763,7 +787,7 @@ impl<'a> canvas::Program<Message> for Editor<'a> {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> mouse::Interaction {
-        match &state.0 {
+        match &state.drag_state {
             Some(_) => mouse::Interaction::Grabbing,
             None => {
                 if let Some(cursor_position) = cursor.position_in(&bounds) {

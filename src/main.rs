@@ -134,11 +134,13 @@ impl Application for Configurator {
         match message {
             Message::EditorMessage(macro_editor::Message::MoveFrame(old_index, new_index)) => {
                 old_index.move_in_macro(new_index, &mut self.key_tab.editor_actions);
+                self.key_tab.editor.select(None);
                 self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::RemoveFrame(index)) => {
                 index.remove_from_macro(&mut self.key_tab.editor_actions);
+                self.key_tab.editor.select(None);
                 self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
@@ -148,23 +150,35 @@ impl Application for Configurator {
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
                 index.add_to_macro(frame.into(), &mut self.key_tab.editor_actions);
+                self.key_tab.editor.select(Some(index.get_action(self.key_tab.editor_actions.as_slice())));
                 self.key_tab.select(Some(SelectedAction::from_index(&index, self.key_tab.editor_actions.as_slice())));
                 self.key_tab.editor.request_redraw();
             }
-            Message::EditorMessage(macro_editor::Message::SelectFrame(index)) => {
-                self.key_tab.select(index);
+            Message::EditorMessage(macro_editor::Message::SelectFrame(action)) => {
+                self.key_tab.editor.select(match &action {
+                    Some(action) => Some(action.index.get_action(self.key_tab.editor_actions.as_slice())),
+                    None => None,
+                });
+                self.key_tab.select(action);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::ReleaseGrab) => {
+                self.key_tab.editor.select(None);
                 self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::DragStart) => {
+                self.key_tab.editor.select(None);
                 self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::Scroll(offset)) => {
                 self.key_tab.editor.scroll_to(offset);
+                self.key_tab.editor.request_redraw();
+            }
+            Message::EditorMessage(macro_editor::Message::FrameClick) => {
+                self.key_tab.editor.select(None);
+                self.key_tab.select(None);
                 self.key_tab.editor.request_redraw();
             }
             Message::HidMessage(_) => {}
