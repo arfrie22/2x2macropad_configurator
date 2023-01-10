@@ -213,12 +213,24 @@ pub struct MacroCollection {
     pub tap_hold: Macro,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BuildInfo {
+    pub firmware_version: String,
+    pub build_date: String,
+    pub build_timestamp: String,
+    pub build_profile: String,
+    pub git_hash: String,
+    pub git_branch: String,
+    pub git_semver: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Macropad {
     pub macros: Vec<MacroCollection>,
     pub config: MacroConfig,
     pub key_configs: Vec<KeyConfig>,
     pub led_config: LedConfig,
+    pub build_info: BuildInfo,
 }
 
 impl Macropad {
@@ -292,19 +304,40 @@ pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
     })
 }
 
+pub fn get_build_info(device: &HidDevice) -> Result<BuildInfo, ()> {
+    let firmware_version = macropad_wrapper::get_firmware_version(device)?;
+    let build_date = macropad_wrapper::get_build_date(device)?;
+    let build_timestamp = macropad_wrapper::get_build_timestamp(device)?;
+    let build_profile = macropad_wrapper::get_build_profile(device)?;
+    let git_hash = macropad_wrapper::get_git_hash(device)?;
+    let git_branch = macropad_wrapper::get_git_branch(device)?;
+    let git_semver = macropad_wrapper::get_git_semver(device)?;
+
+    Ok(BuildInfo {
+        firmware_version,
+        build_date,
+        build_timestamp,
+        build_profile,
+        git_hash,
+        git_branch,
+        git_semver,
+    })
+}
+
 pub fn get_macro_pad(device: &HidDevice) -> Result<Macropad, ()> {
     prime_device(device)?;
     let mut macros = Vec::new();
     let config = get_config(device)?;
     let mut key_configs = Vec::new();
     let led_config = get_led_config(device)?;
+    let build_info = get_build_info(device)?;
 
     for index in 0..4 {
         macros.push(get_macro_collection(device, index)?);
         key_configs.push(get_key_config(device, index)?);
     }
 
-    Ok(Macropad { macros, config, key_configs, led_config })
+    Ok(Macropad { macros, config, key_configs, led_config, build_info })
 }
 
 pub fn parse_macro(data: &[u8; 4092]) -> Macro {

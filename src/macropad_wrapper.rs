@@ -1,6 +1,6 @@
 use crc::{Crc, CRC_32_CKSUM};
 use hidapi::HidDevice;
-use macropad_protocol::data_protocol::{DataCommand, KeyConfigElements, ConfigElements, LedCommand, LedEffect, KeyMode};
+use macropad_protocol::data_protocol::{DataCommand, KeyConfigElements, ConfigElements, LedCommand, LedEffect, KeyMode, BuildInfoElements};
 use usbd_human_interface_device::page::{Keyboard, Consumer};
 
 use crate::macro_parser::KeyConfig;
@@ -410,5 +410,103 @@ pub fn set_led_effect_offset(device: &HidDevice, offset: f32) -> Result<(), ()> 
         Err(())
     } else {
         Ok(())
+    }
+}
+
+pub fn get_firmware_version(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::FirmwareVersion as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_build_date(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::BuildDate as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_build_timestamp(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::BuildTimestamp as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_build_profile(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::BuildProfile as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_git_hash(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::GitHash as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_git_branch(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::GitBranch as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
+    }
+}
+
+pub fn get_git_semver(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildInfo as u8;
+    data[2] = BuildInfoElements::GitSemver as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1..3] != buf[0..2] {
+        Err(())
+    } else {
+        let len = buf[2] as usize;
+        Ok(String::from_utf8(buf[3..3+len].to_vec()).unwrap())
     }
 }
