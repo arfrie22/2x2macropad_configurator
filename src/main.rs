@@ -20,7 +20,7 @@ use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction, A
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
 use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
 use macropad_configurator::{
-    hid_manager, macro_editor, macro_parser, macropad, macropad_wrapper, type_wrapper,
+    hid_manager, macro_editor, macro_parser, macropad, macropad_wrapper, type_wrapper, macropad_updater,
 };
 use macropad_protocol::data_protocol::LedEffect;
 use macropad_protocol::macro_protocol;
@@ -58,10 +58,13 @@ struct Configurator {
 pub enum Message {
     HidMessage(hid_manager::Message),
     HidEvent(hid_manager::Event),
+    UpdaterEvent(macropad_updater::Event),
     EditorMessage(macro_editor::Message),
     CommandSent(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandReceived(macropad_protocol::data_protocol::DataCommand, [u8; 64]),
     CommandErrored,
+    MacropadBootloader,
+    UploadLatestFirmware,
     ButtonPressed(usize),
     ButtonHovered(Option<usize>),
     ButtonClicked(bool),
@@ -113,8 +116,9 @@ impl Application for Configurator {
     fn new(_flags: ()) -> (Configurator, Command<Message>) {
         (
             Configurator {
-                state: State::Disconnected,
+                state: State::Disconnected(None),
                 theme: match dark_light::detect() {
+                    dark_light::Mode::Default => Theme::Dark,
                     dark_light::Mode::Dark => Theme::Dark,
                     dark_light::Mode::Light => Theme::Light,
                 },
@@ -183,18 +187,48 @@ impl Application for Configurator {
             }
             Message::HidMessage(_) => {}
             Message::HidEvent(hid_manager::Event::Connected(connection)) => {
+                if let State::Disconnected(Some(con)) = &mut self.state {
+                    con.send(macropad_updater::Message::Close)
+                }
+
                 self.key_tab = KeyTab::new(connection.get_macropad());
                 self.led_tab = LedTab::new(connection.get_macropad(), LedRunner::default());
                 self.settings_tab = SettingsTab::new(connection.get_macropad(), self.theme.clone());
                 self.state = State::Connected(connection, Page::MainPage(0));
             }
             Message::HidEvent(hid_manager::Event::Disconnected) => {
-                self.state = State::Disconnected;
+                self.state = State::Disconnected(None);
+            }
+            Message::UpdaterEvent(macropad_updater::Event::Connected(connection)) => {
+                if let State::Disconnected(_) = self.state {
+                    self.state = State::Disconnected(Some(connection));
+                }
+            }
+            Message::UpdaterEvent(macropad_updater::Event::Disconnected) => {
+                if let State::Disconnected(_) = self.state {
+                    self.state = State::Disconnected(None);
+                }
             }
             Message::HidEvent(_) => {}
             Message::CommandSent(_, _) => {}
             Message::CommandReceived(_, _) => {}
             Message::CommandErrored => {}
+            Message::MacropadBootloader => {
+                match &mut self.state {
+                    State::Connected(connection, _) => {
+                        connection.send(hid_manager::Message::Set(hid_manager::MacropadCommand::Bootloader));
+                    },
+                    _ => unreachable!(),
+                };
+            }
+            Message::UploadLatestFirmware => {
+                match &mut self.state {
+                    State::Disconnected(Some(connection)) => {
+                        connection.send(macropad_updater::Message::UploadToDevice(None));
+                    },
+                    _ => unreachable!(),
+                };
+            }
             Message::ButtonPressed(i) => {
                 self.state = State::Connected(
                     match &self.state {
@@ -678,22 +712,50 @@ impl Application for Configurator {
                 }
                 _ => Subscription::none(),
             },
+            match &self.state {
+                State::Disconnected(_) => {
+                    macropad_updater::connect().map(Message::UpdaterEvent)
+                }
+                _ => Subscription::none(),
+            },
         ])
     }
 
     fn view(&self) -> Element<Message> {
         match &self.state {
-            State::Disconnected => {
+            State::Disconnected(con) => {
                 // TODO: Add ability to flash firmware
+                let flash_button = container(
+                    if let Some(con) = con {
+                        column![
+                            button("Flash Keyboard").on_press(Message::UploadLatestFirmware),
+                        ]
+                    } else {
+                        column![
+                            text("No device found").size(16).horizontal_alignment(alignment::Horizontal::Center).vertical_alignment(alignment::Vertical::Bottom),
+                        ]
+                    }
+                ).width(Length::Fill).height(Length::Shrink).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom);
+
                 let message = column![
-                    text("Disconnected")
-                        .size(60)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
-                    text("Connect your macropad to get started")
-                        .size(30)
-                        .width(Length::Fill)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    container(
+                        column![
+                            text("Disconnected")
+                                .size(60)
+                                .width(Length::Fill)
+                                .horizontal_alignment(iced::alignment::Horizontal::Center),
+                            text("Connect your macropad to get started")
+                                .size(30)
+                                .width(Length::Fill)
+                                .horizontal_alignment(iced::alignment::Horizontal::Center),
+                        ]
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x()
+                    .center_y(),
+
+                    flash_button,
                 ];
 
                 container(message)
@@ -911,7 +973,7 @@ impl Application for Configurator {
                     .height(Length::Fill)
                     .center_x()
                     .center_y()
-                    .padding(100)
+                    .padding(10)
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
@@ -1237,7 +1299,7 @@ enum TabId {
 
 #[derive(Debug)]
 enum State {
-    Disconnected,
+    Disconnected(Option<macropad_updater::Connection>),
     Connected(hid_manager::Connection, Page),
 }
 
@@ -1267,7 +1329,7 @@ trait Tab {
 }
 
 #[derive(Debug)]
-pub struct actionOptionControls {
+pub struct ActionOptionControls {
     pub delay_text: String,
     pub show_color_picker: bool,
     pub sub_delay_text: String,
@@ -1276,7 +1338,7 @@ pub struct actionOptionControls {
     pub loop_count_text: String,
 }
 
-impl Default for actionOptionControls {
+impl Default for ActionOptionControls {
     fn default() -> Self {
         Self {
             delay_text: String::new(),
@@ -1297,7 +1359,7 @@ struct KeyTab {
     key_configs: Vec<macro_parser::KeyConfig>,
     editor: macro_editor::State,
     editor_actions: Vec<Action>,
-    action_option_controls: actionOptionControls,
+    action_option_controls: ActionOptionControls,
     selected_action: Option<macro_editor::SelectedAction>,
     actions: HashMap<
         macropad_protocol::data_protocol::KeyConfigElements,
@@ -1315,14 +1377,14 @@ impl KeyTab {
             key_configs: macropad.key_configs.clone(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
-            action_option_controls: actionOptionControls::default(),
+            action_option_controls: ActionOptionControls::default(),
             selected_action: None,
             actions: HashMap::new(),
         }
     }
 
     fn select(&mut self, select: Option<SelectedAction>) {
-        self.action_option_controls = actionOptionControls::default();
+        self.action_option_controls = ActionOptionControls::default();
         
         if let Some(select) = select.as_ref() {
             match &select.action_options {
@@ -1432,7 +1494,7 @@ impl Default for KeyTab {
             key_configs: Vec::new(),
             editor: macro_editor::State::default(),
             editor_actions: Vec::new(),
-            action_option_controls: actionOptionControls::default(),
+            action_option_controls: ActionOptionControls::default(),
             selected_action: None,
             actions: HashMap::new(),
         }
@@ -1468,7 +1530,7 @@ impl Tab for KeyTab {
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .padding(100)
+            .padding(10)
             .into()
     }
 }
@@ -1696,7 +1758,7 @@ impl Tab for LedTab {
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .padding(100)
+            .padding(10)
             .into()
     }
 }
@@ -1704,6 +1766,7 @@ impl Tab for LedTab {
 #[derive(Debug)]
 struct SettingsTab {
     config: macro_parser::MacroConfig,
+    build_info: macro_parser::BuildInfo,
     theme: Theme,
     press_time_text: String,
     hold_time_text: String,
@@ -1716,9 +1779,11 @@ struct SettingsTab {
 impl SettingsTab {
     fn new(macropad: Arc<Mutex<macro_parser::Macropad>>, theme: Theme) -> Self {
         let config = macropad.lock().unwrap().config.clone();
+        let build_info = macropad.lock().unwrap().build_info.clone();
 
         Self {
             config: config.clone(),
+            build_info,
             theme,
             press_time_text: (config.tap_speed / 1000).to_string(),
             hold_time_text: (config.hold_speed / 1000).to_string(),
@@ -1773,7 +1838,9 @@ impl Default for SettingsTab {
     fn default() -> Self {
         Self {
             config: macro_parser::MacroConfig::default(),
+            build_info: macro_parser::BuildInfo::default(),
             theme: match dark_light::detect() {
+                dark_light::Mode::Default => Theme::Dark,
                 dark_light::Mode::Dark => Theme::Dark,
                 dark_light::Mode::Light => Theme::Light,
             },
@@ -1846,12 +1913,42 @@ impl Tab for SettingsTab {
                     bottom: 20,
                     left: 0,
                 }),
+
+                container(
+                    button(text("Update Macropad")).on_press(Message::MacropadBootloader)
+                )
+                // .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(alignment::Horizontal::Center)
+                .align_y(alignment::Vertical::Bottom)
             ])
             .width(Length::Fill)
             .height(Length::Fill)
             .align_x(alignment::Horizontal::Center)
             .align_y(alignment::Vertical::Top)
             .padding(20),
+
+
+            container(
+                row![
+                    text(format!("Macropad Version: {}", self.build_info.git_semver))
+                    .size(16)
+                    .vertical_alignment(alignment::Vertical::Bottom)
+                    .horizontal_alignment(alignment::Horizontal::Left)
+                    .width(Length::Fill),
+
+                    text(format!("Configurator Version: {}", env!("CARGO_PKG_VERSION")))
+                    .size(16)
+                    .vertical_alignment(alignment::Vertical::Bottom)
+                    .horizontal_alignment(alignment::Horizontal::Right)
+                    .width(Length::Fill),
+                ]
+            )
+            .width(Length::Fill)
+            .align_x(alignment::Horizontal::Center)
+            .align_y(alignment::Vertical::Bottom)
+            
+            
         ];
 
         container(message)
@@ -1859,7 +1956,7 @@ impl Tab for SettingsTab {
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .padding(100)
+            .padding(10)
             .into()
     }
 }

@@ -32,6 +32,14 @@ pub fn prime_device(device: &HidDevice) -> Result<(), ()> {
     Ok(())
 }
 
+pub fn enter_bootloader(device: &HidDevice) -> Result<(), ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::EnterBootloader as u8;
+    let buf = send_command(device, data)?;
+
+    Ok(())
+}
+
 pub fn get_key_mode(device: &HidDevice, index: u8) -> Result<KeyMode, ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::ReadKeyConfig as u8;

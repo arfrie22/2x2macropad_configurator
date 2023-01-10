@@ -70,6 +70,9 @@ pub fn connect() -> Subscription<Event> {
                         match command {
                             Message::Set(command) => {
                                 let res = match command {
+                                    MacropadCommand::Bootloader => {
+                                        macropad_wrapper::enter_bootloader(&device)
+                                    },
                                     MacropadCommand::KeyMode(i, mode) => {
                                         macropad_wrapper::set_key_mode(&device, i, mode).and_then(|_| {
                                             macropad.lock().unwrap().key_configs[i as usize].key_mode = mode;
@@ -226,6 +229,7 @@ pub enum Message {
 
 #[derive(Debug, Clone)]
 pub enum MacropadCommand {
+    Bootloader,
     KeyMode(u8, macropad_protocol::data_protocol::KeyMode),
     KeyboardData(u8, usbd_human_interface_device::page::Keyboard),
     ConsumerData(u8, usbd_human_interface_device::page::Consumer),
@@ -263,6 +267,7 @@ impl fmt::Display for Message {
             }
             Message::Set(command) => {
                 match command {
+                    MacropadCommand::Bootloader => write!(f, "Enter bootloader"),
                     MacropadCommand::KeyMode(i, mode) => write!(f, "Set key mode of {:?} to {:?}", i, mode),
                     MacropadCommand::KeyboardData(i, data) => write!(f, "Set keyboard data of {:?} to {:?}", i, data),
                     MacropadCommand::ConsumerData(i, data) => write!(f, "Set consumer data of {:?} to {:?}", i, data),

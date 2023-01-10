@@ -1,6 +1,6 @@
 [package]
 name = "macropad_configurator"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "A programmer for the 2x2 Macropad."
 default-run = "macropad_configurator"
@@ -39,11 +39,10 @@ futures = "0.3.25"
 iced_native = "0.7"
 iced_futures = { version = "0.5.1"}
 hidapi = "2.0.2"
-dark-light = "0.2.3"
-reqwest = { version = "0.11.13", features = ["json", "rustls-tls"] }
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.87"
-rand = { version = "0.7", features = ["wasm-bindgen"]}
+dark-light = "1.0"
+reqwest = { version = "0.11.13", features = ["json", "rustls-tls", "blocking"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 usbd-human-interface-device = "0.3.1"
 
@@ -59,3 +58,6 @@ num_enum = { version = "0.5.7"}
 iced_wgpu = "0.7.0"
 iced_graphics = "0.5.0"
 image = "0.24.5"
+sysinfo = "0.27.4"
+tempfile = "3.3.0"
+flate2 = "1.0"

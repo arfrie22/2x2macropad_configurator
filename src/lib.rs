@@ -6,6 +6,7 @@ pub mod macro_parser;
 pub mod macropad;
 pub mod macropad_wrapper;
 pub mod type_wrapper;
+pub mod macropad_updater;
 
 #[cfg(test)]
 mod tests {
