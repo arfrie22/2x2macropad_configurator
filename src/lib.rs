@@ -4,9 +4,9 @@ pub mod led_effects;
 pub mod macro_editor;
 pub mod macro_parser;
 pub mod macropad;
+pub mod macropad_updater;
 pub mod macropad_wrapper;
 pub mod type_wrapper;
-pub mod macropad_updater;
 
 #[cfg(test)]
 mod tests {
@@ -16,13 +16,11 @@ mod tests {
     fn macropad() {
         use std::time::Duration;
 
-        use hidapi::HidApi;
         use crate::macro_parser::{self, ActionType, Macro, MacroFrame};
         use crate::macropad_wrapper::{self, prime_device};
+        use hidapi::HidApi;
 
-        use macropad_protocol::{
-            data_protocol::{KeyMode, LedEffect},
-        };
+        use macropad_protocol::data_protocol::{KeyMode, LedEffect};
         use usbd_human_interface_device::page::{Consumer, Keyboard};
 
         let mut api = HidApi::new().unwrap();
