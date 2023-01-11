@@ -1,22 +1,22 @@
-use hidapi::{HidDevice, HidApi};
+use hidapi::{HidApi, HidDevice};
 use iced_futures::futures;
 use iced_native::subscription::{self, Subscription};
 
 use futures::channel::mpsc;
 
-use futures::stream::StreamExt;
 use async_std::future;
+use futures::stream::StreamExt;
 
 use std::path::PathBuf;
-use std::{fmt, sync::Mutex};
 use std::sync::Arc;
+use std::{fmt, sync::Mutex};
 
-use std::fs::File;
-use std::io::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use sysinfo::SystemExt;
+use std::fs::File;
+use std::io::prelude::*;
 use sysinfo::DiskExt;
+use sysinfo::SystemExt;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Author {
@@ -93,7 +93,7 @@ async fn scan_devices() -> Option<PathBuf> {
         }
     }
 
-    pico_drive  
+    pico_drive
 }
 
 async fn is_connected(pico: PathBuf) -> bool {
@@ -111,21 +111,22 @@ pub fn connect() -> Subscription<Event> {
                 State::NoDeviceFound => {
                     if let Some(pico) = scan_devices().await {
                         let (sender, receiver) = mpsc::channel(100);
-                            (
-                                Some(Event::Connected(Connection(sender))),
-                                State::DeviceFound(pico, receiver),
-                            )
-                    } else {
-                        tokio::time::sleep(
-                            tokio::time::Duration::from_secs(1),
+                        (
+                            Some(Event::Connected(Connection(sender))),
+                            State::DeviceFound(pico, receiver),
                         )
-                        .await;
+                    } else {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
                         (None, State::NoDeviceFound)
                     }
                 }
                 State::DeviceFound(pico, mut input) => {
-                    let command = future::timeout(std::time::Duration::from_secs(1), input.select_next_some()).await;
+                    let command = future::timeout(
+                        std::time::Duration::from_secs(1),
+                        input.select_next_some(),
+                    )
+                    .await;
                     if let Ok(command) = command {
                         match command {
                             Message::UploadToDevice(version) => {
@@ -133,7 +134,7 @@ pub fn connect() -> Subscription<Event> {
                                     .user_agent("2x2macropad_configurator firmware updater")
                                     .build()
                                     .unwrap();
-                                
+
                                 let releases = client.get("https://api.github.com/repos/arfrie22/2x2macropad_firmware/releases")
                                     .send()
                                     .await
@@ -141,12 +142,27 @@ pub fn connect() -> Subscription<Event> {
                                     .json::<Vec<Release>>()
                                     .await
                                     .unwrap();
-                                
 
                                 let firmware = if version.is_some() {
                                     unimplemented!()
-                                }  else {
-                                    client.get(releases.first().unwrap().assets.first().unwrap().browser_download_url.clone()).send().await.unwrap().bytes().await.unwrap()
+                                } else {
+                                    client
+                                        .get(
+                                            releases
+                                                .first()
+                                                .unwrap()
+                                                .assets
+                                                .first()
+                                                .unwrap()
+                                                .browser_download_url
+                                                .clone(),
+                                        )
+                                        .send()
+                                        .await
+                                        .unwrap()
+                                        .bytes()
+                                        .await
+                                        .unwrap()
                                 };
 
                                 let deployed_path = pico.join("out.uf2");
@@ -157,9 +173,7 @@ pub fn connect() -> Subscription<Event> {
                                 (Some(Event::Disconnected), State::NoDeviceFound)
                             }
 
-                            Message::Close => {
-                                (None, State::NoDeviceFound)
-                            }
+                            Message::Close => (None, State::NoDeviceFound),
 
                             _ => (None, State::DeviceFound(pico, input)),
                         }
@@ -179,7 +193,7 @@ pub fn connect() -> Subscription<Event> {
 #[allow(clippy::large_enum_variant)]
 enum State {
     NoDeviceFound,
-    DeviceFound(PathBuf, mpsc::Receiver<Message>,),
+    DeviceFound(PathBuf, mpsc::Receiver<Message>),
 }
 
 impl fmt::Debug for State {
@@ -213,7 +227,7 @@ pub enum Message {
     Connected,
     Disconnected,
     UploadToDevice(Option<String>),
-    Close
+    Close,
 }
 
 impl Message {

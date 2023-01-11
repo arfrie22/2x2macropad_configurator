@@ -10,17 +10,18 @@ use iced::widget::{
 };
 use iced::{alignment, executor, window, Color, Font, Padding, Size};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
-use iced_aw::style::{TabBarStyles, BadgeStyles};
-use iced_aw::{color_picker, ColorPicker, TabLabel, Tabs, Badge};
-use iced_native::widget::{space, checkbox};
+use iced_aw::style::{BadgeStyles, TabBarStyles};
+use iced_aw::{color_picker, Badge, ColorPicker, TabLabel, Tabs};
+use iced_native::widget::{checkbox, space};
 use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO_BYTES};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_editor::{Action, MacroAction, SelectedAction, ActionOptions};
+use macropad_configurator::macro_editor::{Action, ActionOptions, MacroAction, SelectedAction};
 use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
-use macropad_configurator::type_wrapper::{ConsumerWrapper, KeyboardWrapper, Chord};
+use macropad_configurator::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 use macropad_configurator::{
-    hid_manager, macro_editor, macro_parser, macropad, macropad_wrapper, type_wrapper, macropad_updater,
+    hid_manager, macro_editor, macro_parser, macropad, macropad_updater, macropad_wrapper,
+    type_wrapper,
 };
 use macropad_protocol::data_protocol::LedEffect;
 use macropad_protocol::macro_protocol;
@@ -38,7 +39,13 @@ pub fn main() -> iced::Result {
         default_font: Some(ROBOTO_BYTES),
         window: window::Settings {
             position: window::Position::Centered,
-            icon: Some(iced::window::Icon::from_file_data(include_bytes!("../assets/icon/png/MacropadConfigurator_512@2x.png"), Some(image::ImageFormat::Png)).unwrap()),
+            icon: Some(
+                iced::window::Icon::from_file_data(
+                    include_bytes!("../assets/icon/png/MacropadConfigurator_512@2x.png"),
+                    Some(image::ImageFormat::Png),
+                )
+                .unwrap(),
+            ),
             ..window::Settings::default()
         },
         ..Settings::default()
@@ -154,13 +161,22 @@ impl Application for Configurator {
             }
             Message::EditorMessage(macro_editor::Message::AddFrame(frame, index)) => {
                 index.add_to_macro(frame.into(), &mut self.key_tab.editor_actions);
-                self.key_tab.editor.select(Some(index.get_action(self.key_tab.editor_actions.as_slice())));
-                self.key_tab.select(Some(SelectedAction::from_index(&index, self.key_tab.editor_actions.as_slice())));
+                self.key_tab.editor.select(Some(
+                    index.get_action(self.key_tab.editor_actions.as_slice()),
+                ));
+                self.key_tab.select(Some(SelectedAction::from_index(
+                    &index,
+                    self.key_tab.editor_actions.as_slice(),
+                )));
                 self.key_tab.editor.request_redraw();
             }
             Message::EditorMessage(macro_editor::Message::SelectFrame(action)) => {
                 self.key_tab.editor.select(match &action {
-                    Some(action) => Some(action.index.get_action(self.key_tab.editor_actions.as_slice())),
+                    Some(action) => Some(
+                        action
+                            .index
+                            .get_action(self.key_tab.editor_actions.as_slice()),
+                    ),
                     None => None,
                 });
                 self.key_tab.select(action);
@@ -216,8 +232,10 @@ impl Application for Configurator {
             Message::MacropadBootloader => {
                 match &mut self.state {
                     State::Connected(connection, _) => {
-                        connection.send(hid_manager::Message::Set(hid_manager::MacropadCommand::Bootloader));
-                    },
+                        connection.send(hid_manager::Message::Set(
+                            hid_manager::MacropadCommand::Bootloader,
+                        ));
+                    }
                     _ => unreachable!(),
                 };
             }
@@ -225,7 +243,7 @@ impl Application for Configurator {
                 match &mut self.state {
                     State::Disconnected(Some(connection)) => {
                         connection.send(macropad_updater::Message::UploadToDevice(None));
-                    },
+                    }
                     _ => unreachable!(),
                 };
             }
@@ -325,9 +343,7 @@ impl Application for Configurator {
                     con.send(hid_manager::Message::Set(
                         hid_manager::MacropadCommand::Macro(
                             ((*i as u8) << 2) + (macro_type.clone() as u8),
-                            macro_editor::Action::to_macro(
-                                self.key_tab.editor_actions.as_slice(),
-                            ),
+                            macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()),
                         ),
                     ));
                 }
@@ -425,9 +441,7 @@ impl Application for Configurator {
                 if let Ok(speed) = text.parse::<u32>() {
                     self.settings_tab.press_time_text = text;
                     self.settings_tab
-                            .queue_action(hid_manager::MacropadCommand::TapSpeed(
-                                speed * 1000,
-                            ));
+                        .queue_action(hid_manager::MacropadCommand::TapSpeed(speed * 1000));
                 } else if text == "" {
                     self.settings_tab.press_time_text = text;
                 }
@@ -436,9 +450,7 @@ impl Application for Configurator {
                 if let Ok(speed) = text.parse::<u32>() {
                     self.settings_tab.hold_time_text = text;
                     self.settings_tab
-                            .queue_action(hid_manager::MacropadCommand::HoldSpeed(
-                                speed * 1000,
-                            ));
+                        .queue_action(hid_manager::MacropadCommand::HoldSpeed(speed * 1000));
                 } else if text == "" {
                     self.settings_tab.hold_time_text = text;
                 }
@@ -460,11 +472,11 @@ impl Application for Configurator {
                                     self.key_tab.action_option_controls.delay_text = text;
                                     action.delay = Duration::from_millis(ms as u64);
                                 }
-                            },
+                            }
                             _ => {
                                 self.key_tab.action_option_controls.delay_text = text;
                                 action.delay = Duration::from_millis(ms as u64);
-                            },
+                            }
                         }
 
                         action.update_action(&self.key_tab.editor_actions.as_slice());
@@ -473,7 +485,7 @@ impl Application for Configurator {
                 } else if text == "" {
                     self.key_tab.action_option_controls.delay_text = text;
                 }
-            },
+            }
             Message::MacroActionPickColor => {
                 self.key_tab.action_option_controls.show_color_picker = true;
             }
@@ -486,7 +498,7 @@ impl Application for Configurator {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::SetLed(color) => {
                             *color = (c[0], c[1], c[2]);
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -501,15 +513,15 @@ impl Application for Configurator {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::KeyDown(key) => {
                             *key = keyboard.into();
-                        },
+                        }
 
                         macro_editor::ActionOptions::KeyUp(key) => {
                             *key = keyboard.into();
-                        },
+                        }
 
                         macro_editor::ActionOptions::KeyPress(key, _) => {
                             *key = keyboard.into();
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -523,7 +535,7 @@ impl Application for Configurator {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::ConsumerPress(key, _) => {
                             *key = consumer.into();
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -541,29 +553,29 @@ impl Application for Configurator {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
-                            },
+                            }
                             macro_editor::ActionOptions::ConsumerPress(_, delay) => {
                                 if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
-                            },
+                            }
                             macro_editor::ActionOptions::String(_, delay) => {
                                 if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
-                            },
+                            }
                             macro_editor::ActionOptions::Chord(_, delay) => {
                                 if ms > 0 {
                                     *delay = Duration::from_millis(ms as u64);
                                     self.key_tab.action_option_controls.sub_delay_text = text;
                                 }
-                            },
+                            }
                             macro_editor::ActionOptions::Loop(delay, _) => {
                                 *delay = Duration::from_millis(ms as u64);
                                 self.key_tab.action_option_controls.sub_delay_text = text;
-                            },
+                            }
 
                             _ => unreachable!(),
                         }
@@ -574,7 +586,7 @@ impl Application for Configurator {
                 } else if text == "" {
                     self.key_tab.action_option_controls.sub_delay_text = text;
                 }
-            },
+            }
             Message::MacroActionStringChangedText(content) => {
                 // TODO: add \n and \t support
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
@@ -582,7 +594,7 @@ impl Application for Configurator {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::String(string, _) => {
                             *string = content.to_string();
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -590,7 +602,7 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionChordChangedText(content) => {
                 // TODO: add \n, esc, and \t support
 
@@ -607,7 +619,7 @@ impl Application for Configurator {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::Chord(chord, _) => {
                             chord.string = content.to_string();
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -615,13 +627,13 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionChordCtrl(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::Chord(chord, _) => {
                             chord.ctrl = value;
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -629,13 +641,13 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionChordShift(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::Chord(chord, _) => {
                             chord.shift = value;
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -643,13 +655,13 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionChordAlt(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::Chord(chord, _) => {
                             chord.alt = value;
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -657,13 +669,13 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionChordGui(value) => {
                 if let Some(action) = self.key_tab.selected_action.as_mut() {
                     match &mut action.action_options {
                         macro_editor::ActionOptions::Chord(chord, _) => {
                             chord.gui = value;
-                        },
+                        }
 
                         _ => unreachable!(),
                     }
@@ -671,7 +683,7 @@ impl Application for Configurator {
                     action.update_action(&self.key_tab.editor_actions.as_slice());
                     self.key_tab.editor.request_redraw();
                 }
-            },
+            }
             Message::MacroActionLoopCountChangedText(count) => {
                 if let Ok(count) = count.parse::<u8>() {
                     self.key_tab.action_option_controls.loop_count_text = count.to_string();
@@ -679,8 +691,7 @@ impl Application for Configurator {
                         match &mut action.action_options {
                             macro_editor::ActionOptions::Loop(_, loop_count) => {
                                 *loop_count = count;
-
-                            },
+                            }
 
                             _ => unreachable!(),
                         }
@@ -691,7 +702,7 @@ impl Application for Configurator {
                 } else if count == "" {
                     self.key_tab.action_option_controls.loop_count_text = count;
                 }
-            },
+            }
         };
 
         Command::none()
@@ -713,9 +724,7 @@ impl Application for Configurator {
                 _ => Subscription::none(),
             },
             match &self.state {
-                State::Disconnected(_) => {
-                    macropad_updater::connect().map(Message::UpdaterEvent)
-                }
+                State::Disconnected(_) => macropad_updater::connect().map(Message::UpdaterEvent),
                 _ => Subscription::none(),
             },
         ])
@@ -725,36 +734,34 @@ impl Application for Configurator {
         match &self.state {
             State::Disconnected(con) => {
                 // TODO: Add ability to flash firmware
-                let flash_button = container(
-                    if let Some(con) = con {
-                        column![
-                            button("Flash Keyboard").on_press(Message::UploadLatestFirmware),
-                        ]
-                    } else {
-                        column![
-                            text("No device found").size(16).horizontal_alignment(alignment::Horizontal::Center).vertical_alignment(alignment::Vertical::Bottom),
-                        ]
-                    }
-                ).width(Length::Fill).height(Length::Shrink).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom);
+                let flash_button = container(if let Some(con) = con {
+                    column![button("Flash Keyboard").on_press(Message::UploadLatestFirmware),]
+                } else {
+                    column![text("No device found")
+                        .size(16)
+                        .horizontal_alignment(alignment::Horizontal::Center)
+                        .vertical_alignment(alignment::Vertical::Bottom),]
+                })
+                .width(Length::Fill)
+                .height(Length::Shrink)
+                .align_x(alignment::Horizontal::Center)
+                .align_y(alignment::Vertical::Bottom);
 
                 let message = column![
-                    container(
-                        column![
-                            text("Disconnected")
-                                .size(60)
-                                .width(Length::Fill)
-                                .horizontal_alignment(iced::alignment::Horizontal::Center),
-                            text("Connect your macropad to get started")
-                                .size(30)
-                                .width(Length::Fill)
-                                .horizontal_alignment(iced::alignment::Horizontal::Center),
-                        ]
-                    )
+                    container(column![
+                        text("Disconnected")
+                            .size(60)
+                            .width(Length::Fill)
+                            .horizontal_alignment(iced::alignment::Horizontal::Center),
+                        text("Connect your macropad to get started")
+                            .size(30)
+                            .width(Length::Fill)
+                            .horizontal_alignment(iced::alignment::Horizontal::Center),
+                    ])
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center_x()
                     .center_y(),
-
                     flash_button,
                 ];
 
@@ -775,7 +782,7 @@ impl Application for Configurator {
                 .tab_bar_position(iced_aw::TabBarPosition::Bottom)
                 .text_size(20)
                 .into(),
-            State::Connected(_, Page::ModifyKey(i)) => {                
+            State::Connected(_, Page::ModifyKey(i)) => {
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
                     macropad_protocol::data_protocol::KeyMode::MacroMode => {
                         column![container(column![
@@ -913,7 +920,6 @@ impl Application for Configurator {
                         )
                         .align_x(iced::alignment::Horizontal::Left),
                         text(format!("Modify Key {}", i))
-                            
                             .size(60)
                             .width(Length::Fill)
                             .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -977,8 +983,9 @@ impl Application for Configurator {
                     .into()
             }
             State::Connected(_, Page::EditMacro(i, macro_type)) => {
-                let macro_size = macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()).size();
-                
+                let macro_size =
+                    macro_editor::Action::to_macro(self.key_tab.editor_actions.as_slice()).size();
+
                 let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
                     let action_delay = container(column![
                         text("Post Action Delay (ms)").size(30),
@@ -990,44 +997,31 @@ impl Application for Configurator {
                         ),
                     ]);
 
-
                     match &action.action_options {
                         macro_editor::ActionOptions::Empty => {
-                            column![
-                                action_delay,
-                            ]
-                        },
+                            column![action_delay,]
+                        }
                         macro_editor::ActionOptions::SetLed(color) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("LED Color").size(30),
                                 ColorPicker::new(
                                     self.key_tab.action_option_controls.show_color_picker,
-                                    Color::from_rgb8(
-                                        color.0,
-                                        color.1,
-                                        color.2
-                                    ),
+                                    Color::from_rgb8(color.0, color.1, color.2),
                                     button("Pick Color").on_press(Message::MacroActionPickColor),
                                     Message::MacroActionCancelColor,
                                     Message::MacroActionSubmitColor,
                                 )
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::ClearLed => {
-                            column![
-                                action_delay,
-                            ]
-                        },
+                            column![action_delay,]
+                        }
                         macro_editor::ActionOptions::KeyDown(key) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
@@ -1036,13 +1030,11 @@ impl Application for Configurator {
                                     Message::MacroActionChooseKey
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::KeyUp(key) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
@@ -1051,13 +1043,11 @@ impl Application for Configurator {
                                     Message::MacroActionChooseKey
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::KeyPress(key, delay) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Key").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
@@ -1065,9 +1055,7 @@ impl Application for Configurator {
                                     Some(key.clone().into()),
                                     Message::MacroActionChooseKey
                                 ),
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1076,13 +1064,11 @@ impl Application for Configurator {
                                     Message::MacroActionSubDelayChangedText
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::ConsumerPress(key, delay) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Consumer").size(30),
                                 Space::with_height(Length::Units(10)),
                                 pick_list(
@@ -1090,9 +1076,7 @@ impl Application for Configurator {
                                     Some(key.clone().into()),
                                     Message::MacroActionChooseConsumer
                                 ),
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1101,13 +1085,11 @@ impl Application for Configurator {
                                     Message::MacroActionSubDelayChangedText
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::String(string, delay) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Text").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1115,9 +1097,7 @@ impl Application for Configurator {
                                     self.key_tab.action_option_controls.string_text.as_str(),
                                     Message::MacroActionStringChangedText
                                 ),
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Letter Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1126,14 +1106,12 @@ impl Application for Configurator {
                                     Message::MacroActionSubDelayChangedText
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::Chord(chord, delay) => {
                             // TODO: Chord should have check boxes to choose ctrl + shift + alt + GUI, also same as string \n and \t should be repalced by a down and right arrow respectively
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Keys").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1141,34 +1119,15 @@ impl Application for Configurator {
                                     self.key_tab.action_option_controls.chord_text.as_str(),
                                     Message::MacroActionChordChangedText
                                 ),
-
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Ctrl",
-                                    chord.ctrl,
-                                    Message::MacroActionChordCtrl
-                                ),
+                                checkbox("Ctrl", chord.ctrl, Message::MacroActionChordCtrl),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Shift",
-                                    chord.shift,
-                                    Message::MacroActionChordShift
-                                ),
+                                checkbox("Shift", chord.shift, Message::MacroActionChordShift),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "Alt",
-                                    chord.alt,
-                                    Message::MacroActionChordAlt
-                                ),
+                                checkbox("Alt", chord.alt, Message::MacroActionChordAlt),
                                 Space::with_height(Length::Units(10)),
-                                checkbox(
-                                    "GUI",
-                                    chord.gui,
-                                    Message::MacroActionChordGui
-                                ),
-
+                                checkbox("GUI", chord.gui, Message::MacroActionChordGui),
                                 Space::with_height(Length::Units(20)),
-
                                 text("Hold Time (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1177,13 +1136,11 @@ impl Application for Configurator {
                                     Message::MacroActionSubDelayChangedText
                                 ),
                             ]
-                        },
+                        }
                         macro_editor::ActionOptions::Loop(delay, count) => {
                             column![
                                 action_delay,
-
                                 Space::with_height(Length::Units(20)),
-
                                 text("Per Loop Delay (ms)").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1191,10 +1148,7 @@ impl Application for Configurator {
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
-
                                 Space::with_height(Length::Units(20)),
-                                
-
                                 text("Loop Count").size(30),
                                 Space::with_height(Length::Units(10)),
                                 text_input(
@@ -1203,41 +1157,48 @@ impl Application for Configurator {
                                     Message::MacroActionLoopCountChangedText
                                 ),
                             ]
-                        },
+                        }
                     }
                 } else {
-                    column![
-                        text("Nothing selected").size(30),
-                    ]
+                    column![text("Nothing selected").size(30),]
                 };
 
                 let macro_controls = container(column![
                     row![
                         text("Macro Size:").size(30),
                         Space::with_width(Length::Units(10)),
-                        Badge::new(Text::new(format!("{}/4092", macro_size))).style(if macro_size > 4092 {
+                        Badge::new(Text::new(format!("{}/4092", macro_size))).style(
+                            if macro_size > 4092 {
                                 BadgeStyles::Danger
                             } else if macro_size > 4000 {
                                 BadgeStyles::Warning
                             } else {
                                 BadgeStyles::Success
-                            }),
+                            }
+                        ),
                     ],
-
                     container(action_settings)
-                        .width(Length::Fill).height(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Top).padding(Padding {
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .align_x(alignment::Horizontal::Center)
+                        .align_y(alignment::Vertical::Top)
+                        .padding(Padding {
                             top: 20,
                             right: 0,
                             bottom: 20,
                             left: 0,
                         }),
-
                     container(row![
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
                         Space::with_width(Length::Units(40)),
                         button("Save").on_press(Message::SaveMacro),
-                        ]).width(Length::Fill).align_x(alignment::Horizontal::Center).align_y(alignment::Vertical::Bottom)
-                ]).width(Length::Units(300)).padding(Padding {
+                    ])
+                    .width(Length::Fill)
+                    .align_x(alignment::Horizontal::Center)
+                    .align_y(alignment::Vertical::Bottom)
+                ])
+                .width(Length::Units(300))
+                .padding(Padding {
                     top: 0,
                     right: 0,
                     bottom: 0,
@@ -1245,24 +1206,26 @@ impl Application for Configurator {
                 });
 
                 let message = column![
-                    text(format!("Edit The {} Macro for Key {}", match macro_type {
-                        macro_parser::MacroType::Tap => "Single Tap",
-                        macro_parser::MacroType::Hold => "Hold",
-                        macro_parser::MacroType::DoubleTap => "Double Tap",
-                        macro_parser::MacroType::TapHold => "Tap and Hold",
-                    }, i))
-                        
-                        .size(60),
+                    text(format!(
+                        "Edit The {} Macro for Key {}",
+                        match macro_type {
+                            macro_parser::MacroType::Tap => "Single Tap",
+                            macro_parser::MacroType::Hold => "Hold",
+                            macro_parser::MacroType::DoubleTap => "Double Tap",
+                            macro_parser::MacroType::TapHold => "Tap and Hold",
+                        },
+                        i
+                    ))
+                    .size(60),
                     row![
                         self.key_tab
                             .editor
                             .view(&self.key_tab.editor_actions.as_slice())
                             .map(Message::EditorMessage),
-                        
                         macro_controls,
                     ],
                 ];
-                
+
                 container(message)
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -1385,32 +1348,32 @@ impl KeyTab {
 
     fn select(&mut self, select: Option<SelectedAction>) {
         self.action_option_controls = ActionOptionControls::default();
-        
+
         if let Some(select) = select.as_ref() {
             match &select.action_options {
-                macro_editor::ActionOptions::Empty => {},
-                macro_editor::ActionOptions::SetLed(_) => {},
-                macro_editor::ActionOptions::ClearLed => {},
-                macro_editor::ActionOptions::KeyDown(_) => {},
-                macro_editor::ActionOptions::KeyUp(_) => {},
+                macro_editor::ActionOptions::Empty => {}
+                macro_editor::ActionOptions::SetLed(_) => {}
+                macro_editor::ActionOptions::ClearLed => {}
+                macro_editor::ActionOptions::KeyDown(_) => {}
+                macro_editor::ActionOptions::KeyUp(_) => {}
                 macro_editor::ActionOptions::KeyPress(_, delay) => {
                     self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                },
+                }
                 macro_editor::ActionOptions::ConsumerPress(_, delay) => {
                     self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                },
+                }
                 macro_editor::ActionOptions::String(string, delay) => {
                     self.action_option_controls.string_text = string.clone();
                     self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                },
+                }
                 macro_editor::ActionOptions::Chord(chord, delay) => {
                     self.action_option_controls.chord_text = chord.string.clone();
                     self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
-                },
+                }
                 macro_editor::ActionOptions::Loop(delay, count) => {
                     self.action_option_controls.sub_delay_text = delay.as_millis().to_string();
                     self.action_option_controls.loop_count_text = count.to_string();
-                },
+                }
             }
 
             self.action_option_controls.delay_text = select.delay.as_millis().to_string();
@@ -1515,7 +1478,6 @@ impl Tab for KeyTab {
     fn content(&self) -> Element<'_, Self::Message> {
         let message = column![
             text("Select a key to modify")
-                
                 .size(60)
                 .width(Length::Fill)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -1694,7 +1656,6 @@ impl Tab for LedTab {
                             self.period_text.as_str(),
                             Message::LedPeriodChangedText
                         )
-                        
                         .width(Length::Units(50)),
                     ],
                 ])
@@ -1719,7 +1680,6 @@ impl Tab for LedTab {
                             self.brightness_text.as_str(),
                             Message::LedBrightnessChangedText
                         )
-                        
                         .width(Length::Units(50)),
                     ],
                 ])
@@ -1888,7 +1848,6 @@ impl Tab for SettingsTab {
                         self.press_time_text.as_str(),
                         Message::PressTimeChangedText
                     )
-                    
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
@@ -1904,7 +1863,6 @@ impl Tab for SettingsTab {
                         self.hold_time_text.as_str(),
                         Message::HoldTimeChangedText
                     )
-                    
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
@@ -1913,42 +1871,35 @@ impl Tab for SettingsTab {
                     bottom: 20,
                     left: 0,
                 }),
-
-                container(
-                    button(text("Update Macropad")).on_press(Message::MacropadBootloader)
-                )
-                // .width(Length::Fill)
-                .height(Length::Fill)
-                .align_x(alignment::Horizontal::Center)
-                .align_y(alignment::Vertical::Bottom)
+                container(button(text("Update Macropad")).on_press(Message::MacropadBootloader))
+                    // .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(alignment::Horizontal::Center)
+                    .align_y(alignment::Vertical::Bottom)
             ])
             .width(Length::Fill)
             .height(Length::Fill)
             .align_x(alignment::Horizontal::Center)
             .align_y(alignment::Vertical::Top)
             .padding(20),
-
-
-            container(
-                row![
-                    text(format!("Macropad Version: {}", self.build_info.git_semver))
+            container(row![
+                text(format!("Macropad Version: {}", self.build_info.git_semver))
                     .size(16)
                     .vertical_alignment(alignment::Vertical::Bottom)
                     .horizontal_alignment(alignment::Horizontal::Left)
                     .width(Length::Fill),
-
-                    text(format!("Configurator Version: {}", env!("CARGO_PKG_VERSION")))
-                    .size(16)
-                    .vertical_alignment(alignment::Vertical::Bottom)
-                    .horizontal_alignment(alignment::Horizontal::Right)
-                    .width(Length::Fill),
-                ]
-            )
+                text(format!(
+                    "Configurator Version: {}",
+                    env!("CARGO_PKG_VERSION")
+                ))
+                .size(16)
+                .vertical_alignment(alignment::Vertical::Bottom)
+                .horizontal_alignment(alignment::Horizontal::Right)
+                .width(Length::Fill),
+            ])
             .width(Length::Fill)
             .align_x(alignment::Horizontal::Center)
             .align_y(alignment::Vertical::Bottom)
-            
-            
         ];
 
         container(message)
