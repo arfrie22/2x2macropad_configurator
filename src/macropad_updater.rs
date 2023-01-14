@@ -1,4 +1,3 @@
-use hidapi::{HidApi, HidDevice};
 use iced_futures::futures;
 use iced_native::subscription::{self, Subscription};
 
@@ -7,9 +6,8 @@ use futures::channel::mpsc;
 use async_std::future;
 use futures::stream::StreamExt;
 
+use std::fmt;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::{fmt, sync::Mutex};
 
 use serde::Deserialize;
 use serde::Serialize;

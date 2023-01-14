@@ -1159,282 +1159,282 @@ impl From<Vec<Keyboard>> for Chord {
         for key in keys {
             match key {
                 Keyboard::A => {
-                    if !string.contains("A") {
+                    if !string.contains('A') {
                         string.push('A');
                     }
                 }
                 Keyboard::B => {
-                    if !string.contains("B") {
+                    if !string.contains('B') {
                         string.push('B');
                     }
                 }
                 Keyboard::C => {
-                    if !string.contains("C") {
+                    if !string.contains('C') {
                         string.push('C');
                     }
                 }
                 Keyboard::D => {
-                    if !string.contains("D") {
+                    if !string.contains('D') {
                         string.push('D');
                     }
                 }
                 Keyboard::E => {
-                    if !string.contains("E") {
+                    if !string.contains('E') {
                         string.push('E');
                     }
                 }
                 Keyboard::F => {
-                    if !string.contains("F") {
+                    if !string.contains('F') {
                         string.push('F');
                     }
                 }
                 Keyboard::G => {
-                    if !string.contains("G") {
+                    if !string.contains('G') {
                         string.push('G');
                     }
                 }
                 Keyboard::H => {
-                    if !string.contains("H") {
+                    if !string.contains('H') {
                         string.push('H');
                     }
                 }
                 Keyboard::I => {
-                    if !string.contains("I") {
+                    if !string.contains('I') {
                         string.push('I');
                     }
                 }
                 Keyboard::J => {
-                    if !string.contains("J") {
+                    if !string.contains('J') {
                         string.push('J');
                     }
                 }
                 Keyboard::K => {
-                    if !string.contains("K") {
+                    if !string.contains('K') {
                         string.push('K');
                     }
                 }
                 Keyboard::L => {
-                    if !string.contains("L") {
+                    if !string.contains('L') {
                         string.push('L');
                     }
                 }
                 Keyboard::M => {
-                    if !string.contains("M") {
+                    if !string.contains('M') {
                         string.push('M');
                     }
                 }
                 Keyboard::N => {
-                    if !string.contains("N") {
+                    if !string.contains('N') {
                         string.push('N');
                     }
                 }
                 Keyboard::O => {
-                    if !string.contains("O") {
+                    if !string.contains('O') {
                         string.push('O');
                     }
                 }
                 Keyboard::P => {
-                    if !string.contains("P") {
+                    if !string.contains('P') {
                         string.push('P');
                     }
                 }
                 Keyboard::Q => {
-                    if !string.contains("Q") {
+                    if !string.contains('Q') {
                         string.push('Q');
                     }
                 }
                 Keyboard::R => {
-                    if !string.contains("R") {
+                    if !string.contains('R') {
                         string.push('R');
                     }
                 }
                 Keyboard::S => {
-                    if !string.contains("S") {
+                    if !string.contains('S') {
                         string.push('S');
                     }
                 }
                 Keyboard::T => {
-                    if !string.contains("T") {
+                    if !string.contains('T') {
                         string.push('T');
                     }
                 }
                 Keyboard::U => {
-                    if !string.contains("U") {
+                    if !string.contains('U') {
                         string.push('U');
                     }
                 }
                 Keyboard::V => {
-                    if !string.contains("V") {
+                    if !string.contains('V') {
                         string.push('V');
                     }
                 }
                 Keyboard::W => {
-                    if !string.contains("W") {
+                    if !string.contains('W') {
                         string.push('W');
                     }
                 }
                 Keyboard::X => {
-                    if !string.contains("X") {
+                    if !string.contains('X') {
                         string.push('X');
                     }
                 }
                 Keyboard::Y => {
-                    if !string.contains("Y") {
+                    if !string.contains('Y') {
                         string.push('Y');
                     }
                 }
                 Keyboard::Z => {
-                    if !string.contains("Z") {
+                    if !string.contains('Z') {
                         string.push('Z');
                     }
                 }
                 Keyboard::Keyboard1 => {
-                    if !string.contains("1") {
+                    if !string.contains('1') {
                         string.push('1');
                     }
                 }
                 Keyboard::Keyboard2 => {
-                    if !string.contains("2") {
+                    if !string.contains('2') {
                         string.push('2');
                     }
                 }
                 Keyboard::Keyboard3 => {
-                    if !string.contains("3") {
+                    if !string.contains('3') {
                         string.push('3');
                     }
                 }
                 Keyboard::Keyboard4 => {
-                    if !string.contains("4") {
+                    if !string.contains('4') {
                         string.push('4');
                     }
                 }
                 Keyboard::Keyboard5 => {
-                    if !string.contains("5") {
+                    if !string.contains('5') {
                         string.push('5');
                     }
                 }
                 Keyboard::Keyboard6 => {
-                    if !string.contains("6") {
+                    if !string.contains('6') {
                         string.push('6');
                     }
                 }
                 Keyboard::Keyboard7 => {
-                    if !string.contains("7") {
+                    if !string.contains('7') {
                         string.push('7');
                     }
                 }
                 Keyboard::Keyboard8 => {
-                    if !string.contains("8") {
+                    if !string.contains('8') {
                         string.push('8');
                     }
                 }
                 Keyboard::Keyboard9 => {
-                    if !string.contains("9") {
+                    if !string.contains('9') {
                         string.push('9');
                     }
                 }
                 Keyboard::Keyboard0 => {
-                    if !string.contains("0") {
+                    if !string.contains('0') {
                         string.push('0');
                     }
                 }
                 Keyboard::ReturnEnter => {
-                    if !string.contains("⏎") {
+                    if !string.contains('⏎') {
                         string.push('⏎');
                     }
                 }
                 Keyboard::Escape => {
-                    if !string.contains("⎋") {
+                    if !string.contains('⎋') {
                         string.push('⎋');
                     }
                 }
                 Keyboard::Tab => {
-                    if !string.contains("⇥") {
+                    if !string.contains('⇥') {
                         string.push('⇥');
                     }
                 }
                 Keyboard::Space => {
-                    if !string.contains(" ") {
+                    if !string.contains(' ') {
                         string.push(' ');
                     }
                 }
                 Keyboard::Minus => {
-                    if !string.contains("-") {
+                    if !string.contains('-') {
                         string.push('-');
                     }
                 }
                 Keyboard::Equal => {
-                    if !string.contains("=") {
+                    if !string.contains('=') {
                         string.push('=');
                     }
                 }
                 Keyboard::LeftBrace => {
-                    if !string.contains("[") {
+                    if !string.contains('[') {
                         string.push('[');
                     }
                 }
                 Keyboard::RightBrace => {
-                    if !string.contains("]") {
+                    if !string.contains(']') {
                         string.push(']');
                     }
                 }
                 Keyboard::Backslash => {
-                    if !string.contains("\\") {
+                    if !string.contains('\\') {
                         string.push('\\');
                     }
                 }
                 Keyboard::NonUSHash => {
-                    if !string.contains("#") {
+                    if !string.contains('#') {
                         string.push('#');
                     }
                 }
                 Keyboard::Semicolon => {
-                    if !string.contains(";") {
+                    if !string.contains(';') {
                         string.push(';');
                     }
                 }
                 Keyboard::Apostrophe => {
-                    if !string.contains("'") {
+                    if !string.contains('\'') {
                         string.push('\'');
                     }
                 }
                 Keyboard::Grave => {
-                    if !string.contains("`") {
+                    if !string.contains('`') {
                         string.push('`');
                     }
                 }
                 Keyboard::Comma => {
-                    if !string.contains(",") {
+                    if !string.contains(',') {
                         string.push(',');
                     }
                 }
                 Keyboard::Dot => {
-                    if !string.contains(".") {
+                    if !string.contains('.') {
                         string.push('.');
                     }
                 }
                 Keyboard::ForwardSlash => {
-                    if !string.contains("/") {
+                    if !string.contains('/') {
                         string.push('/');
                     }
                 }
                 Keyboard::RightArrow => {
-                    if !string.contains("→") {
+                    if !string.contains('→') {
                         string.push('→');
                     }
                 }
                 Keyboard::LeftArrow => {
-                    if !string.contains("←") {
+                    if !string.contains('←') {
                         string.push('←');
                     }
                 }
                 Keyboard::DownArrow => {
-                    if !string.contains("↓") {
+                    if !string.contains('↓') {
                         string.push('↓');
                     }
                 }
                 Keyboard::UpArrow => {
-                    if !string.contains("↑") {
+                    if !string.contains('↑') {
                         string.push('↑');
                     }
                 }

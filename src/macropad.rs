@@ -1,30 +1,9 @@
 use iced::{Background, Color};
-// For now, to implement a custom native widget you will need to add
-// `iced_native` and `iced_wgpu` to your dependencies.
-//
-// Then, you simply need to define your widget type and implement the
-// `iced_native::Widget` trait with the `iced_wgpu::Renderer`.
-//
-// Of course, you can choose to make the implementation renderer-agnostic,
-// if you wish to, by creating your own `Renderer` trait, which could be
-// implemented by `iced_wgpu` and other renderers.
 use iced_graphics::renderer::{self, Renderer};
-use iced_graphics::triangle::ColoredVertex2D;
 use iced_graphics::{Backend, Primitive};
 use iced_native::layout::{self, Layout};
-use iced_native::renderer::BorderRadius;
 use iced_native::widget::{self, Widget};
-use iced_native::{Element, Length, Point, Rectangle, Size, Vector};
-
-// For now, to implement a custom native widget you will need to add
-// `iced_native` and `iced_wgpu` to your dependencies.
-//
-// Then, you simply need to define your widget type and implement the
-// `iced_native::Widget` trait with the `iced_wgpu::Renderer`.
-//
-// Of course, you can choose to make the implementation renderer-agnostic,
-// if you wish to, by creating your own `Renderer` trait, which could be
-// implemented by `iced_wgpu` and other renderers.
+use iced_native::{Element, Length, Point, Rectangle, Size};
 
 #[derive(Default)]
 pub struct Macropad<'a, Message> {
@@ -242,12 +221,9 @@ where
         _theme: &T,
         _style: &renderer::Style,
         layout: Layout<'_>,
-        cursor_position: Point,
+        _cursor_position: Point,
         _viewport: &Rectangle,
     ) {
-        use iced_graphics::triangle::Mesh2D;
-        use iced_native::Renderer as _;
-
         let b = layout.bounds();
 
         let len = b.width.min(b.height);

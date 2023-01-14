@@ -1,8 +1,6 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::RefCell;
 use std::ops::Sub;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use iced::widget::canvas::event::{self, Event};
@@ -11,7 +9,7 @@ use iced::{mouse, Color, Size, Vector};
 use iced::{Element, Length, Point, Rectangle, Theme};
 
 use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD};
-use crate::macro_parser::{self, ActionType, Macro, MacroFrame};
+use crate::macro_parser::{self, ActionType, MacroFrame};
 use crate::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 
 const CLOSE_BUTTON_PADDING: f32 = 1.0;
@@ -112,7 +110,7 @@ impl Index {
     }
 
     fn add_to_macro_recurse(index: Index, action: Action, root: Action) {
-        if let ActionWrapper::Loop(mut actions, delay, count) = root.get_action() {
+        if let ActionWrapper::Loop(actions, delay, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
                 let parent_index = parents.remove(0);
@@ -149,10 +147,10 @@ impl Index {
     }
 
     fn remove_from_macro_recurse(index: Index, root: Action) -> Action {
-        if let ActionWrapper::Loop(mut actions, delay, count) = root.get_action() {
+        if let ActionWrapper::Loop(actions, delay, count) = root.get_action() {
             if !index.parents.is_empty() {
                 let mut parents = index.parents.clone();
-                let mut parent_index = parents.remove(0);
+                let parent_index = parents.remove(0);
                 let index = Index {
                     index: index.index,
                     parents,
@@ -912,7 +910,6 @@ impl From<MacroFrame> for MacroAction {
                 ActionWrapper::Loop(actions, delay, loop_count)
             }
         };
-        let length = action.calculate_length();
         MacroAction {
             action,
             delay: frame.delay,
@@ -1772,10 +1769,10 @@ impl Action {
     }
 
     pub fn from_macro(macro_data: &crate::macro_parser::Macro) -> Vec<Action> {
-        return Action::from_frames(&macro_data.frames, Vec::new());
+        return Action::from_frames(&macro_data.frames);
     }
 
-    fn from_frames(frames: &[MacroFrame], parents: Vec<Arc<Mutex<Index>>>) -> Vec<Action> {
+    fn from_frames(frames: &[MacroFrame]) -> Vec<Action> {
         let mut actions = Vec::new();
 
         for frame in frames {
@@ -1828,6 +1825,7 @@ impl Arguments {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_spacer(mut self, width: f32) -> Self {
         self.offset += width;
         self

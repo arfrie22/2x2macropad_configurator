@@ -2,31 +2,27 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use iced::subscription::{events, events_with};
 use iced::theme::Button;
 use iced::widget::{
-    button, column, container, pane_grid, pick_list, progress_bar, radio, row, slider, text,
-    text_input, Column, Container, Row, Space, Text,
+    button, column, container, pick_list, radio, row, slider, text, text_input, Column, Container,
+    Space, Text,
 };
-use iced::{alignment, executor, window, Color, Font, Padding, Size};
-use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
+use iced::{alignment, executor, window, Color, Padding};
+use iced::{Application, Command, Element, Length, Settings, Subscription, Theme};
 use iced_aw::style::{BadgeStyles, TabBarStyles};
-use iced_aw::{color_picker, Badge, ColorPicker, TabLabel, Tabs};
-use iced_native::widget::{checkbox, space};
+use iced_aw::{Badge, ColorPicker, TabLabel, Tabs};
+use iced_native::widget::checkbox;
 use macropad_configurator::font::{Icon, ICON_FONT, ROBOTO_BYTES};
 use macropad_configurator::hid_manager::Connection;
 use macropad_configurator::led_effects::LedRunner;
-use macropad_configurator::macro_editor::{Action, ActionOptions, MacroAction, SelectedAction};
-use macropad_configurator::macro_parser::{ActionType, LedConfig, MacroFrame};
+use macropad_configurator::macro_editor::{Action, ActionOptions, SelectedAction};
+use macropad_configurator::macro_parser::LedConfig;
 use macropad_configurator::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 use macropad_configurator::{
-    hid_manager, macro_editor, macro_parser, macropad, macropad_updater, macropad_wrapper,
-    type_wrapper,
+    hid_manager, macro_editor, macro_parser, macropad, macropad_updater, type_wrapper,
 };
 use macropad_protocol::data_protocol::LedEffect;
-use macropad_protocol::macro_protocol;
 use num_enum::{FromPrimitive, IntoPrimitive};
-use usbd_human_interface_device::page::{Consumer, Keyboard};
 
 const ACTION_DELAY: u64 = 200;
 
@@ -250,7 +246,10 @@ impl Application for Configurator {
             Message::ButtonPressed(i) => {
                 self.state = State::Connected(
                     match &self.state {
-                        State::Connected(connection, _) => connection.clone(),
+                        State::Connected(connection, _) => {
+                            self.key_tab.update_config(connection.get_macropad());
+                            connection.clone()
+                        }
                         _ => unreachable!(),
                     },
                     Page::ModifyKey(i),
@@ -297,7 +296,9 @@ impl Application for Configurator {
                     match &mut self.state {
                         State::Connected(connection, _) => {
                             match TabId::from(i) {
-                                TabId::MainPage => {}
+                                TabId::MainPage => {
+                                    self.key_tab.update_config(connection.get_macropad());
+                                }
                                 TabId::ModifyLed => {
                                     self.led_tab.led_runner.reset();
                                     self.led_tab.update_config(connection.get_macropad());
@@ -314,7 +315,7 @@ impl Application for Configurator {
                 );
             }
             Message::KeyModeChanged(mode) => {
-                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                if let State::Connected(_, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
                         .queue_action(hid_manager::MacropadCommand::KeyMode(*i as u8, mode));
                 }
@@ -349,7 +350,7 @@ impl Application for Configurator {
                 }
             }
             Message::KeyboardDataChanged(data) => {
-                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                if let State::Connected(_, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
                         .queue_action(hid_manager::MacropadCommand::KeyboardData(
                             *i as u8,
@@ -358,7 +359,7 @@ impl Application for Configurator {
                 }
             }
             Message::ConsumerDataChanged(data) => {
-                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                if let State::Connected(_, Page::ModifyKey(i)) = &mut self.state {
                     self.key_tab
                         .queue_action(hid_manager::MacropadCommand::ConsumerData(
                             *i as u8,
@@ -367,7 +368,7 @@ impl Application for Configurator {
                 }
             }
             Message::KeyPickColor => {
-                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                if let State::Connected(_, Page::ModifyKey(_)) = &mut self.state {
                     self.key_tab.show_picker = true;
                 }
             }
@@ -375,7 +376,7 @@ impl Application for Configurator {
                 self.key_tab.show_picker = false;
             }
             Message::KeySubmitColor(color) => {
-                if let State::Connected(con, Page::ModifyKey(i)) = &mut self.state {
+                if let State::Connected(_, Page::ModifyKey(i)) = &mut self.state {
                     let c = color.into_rgba8();
                     self.key_tab
                         .queue_action(hid_manager::MacropadCommand::KeyColor(
@@ -712,13 +713,13 @@ impl Application for Configurator {
         Subscription::batch([
             hid_manager::connect().map(Message::HidEvent),
             match &self.state {
-                State::Connected(_, Page::MainPage(i)) => {
+                State::Connected(_, Page::MainPage(_)) => {
                     iced::time::every(Duration::from_millis(16)).map(Message::LedUpdate)
                 }
                 _ => Subscription::none(),
             },
             match &self.state {
-                State::Connected(con, _) => {
+                State::Connected(_, _) => {
                     iced::time::every(Duration::from_millis(50)).map(Message::UpdateTick)
                 }
                 _ => Subscription::none(),
@@ -734,7 +735,7 @@ impl Application for Configurator {
         match &self.state {
             State::Disconnected(con) => {
                 // TODO: Add ability to flash firmware
-                let flash_button = container(if let Some(con) = con {
+                let flash_button = container(if let Some(_) = con {
                     column![button("Flash Keyboard").on_press(Message::UploadLatestFirmware),]
                 } else {
                     column![text("No device found")
@@ -1388,7 +1389,7 @@ impl KeyTab {
     }
 
     fn run_actions(&mut self, con: &mut Connection) {
-        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+        for (_, (active, time_to_run, action)) in self.actions.iter_mut() {
             if *active && time_to_run.elapsed() > Duration::ZERO {
                 *active = false;
 
@@ -1529,7 +1530,7 @@ impl LedTab {
     }
 
     fn run_actions(&mut self, con: &mut Connection) {
-        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+        for (_, (active, time_to_run, action)) in self.actions.iter_mut() {
             if *active && time_to_run.elapsed() > Duration::ZERO {
                 *active = false;
 
@@ -1756,7 +1757,7 @@ impl SettingsTab {
     }
 
     fn run_actions(&mut self, con: &mut Connection) {
-        for (command, (active, time_to_run, action)) in self.actions.iter_mut() {
+        for (_, (active, time_to_run, action)) in self.actions.iter_mut() {
             if *active && time_to_run.elapsed() > Duration::ZERO {
                 *active = false;
 

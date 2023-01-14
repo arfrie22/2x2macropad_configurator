@@ -35,9 +35,13 @@ iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = [
     "tabs",
     "badge",
 ] }
-futures = "0.3.25"
 iced_native = "0.7"
 iced_futures = { version = "0.5.1"}
+iced_wgpu = "0.7"
+iced_graphics = "0.5"
+# iced_core = "0.6"
+
+futures = "0.3.25"
 hidapi = "2.0.2"
 dark-light = "1.0"
 reqwest = { version = "0.11.13", features = ["json", "rustls-tls", "blocking"] }
@@ -55,8 +59,6 @@ macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol", 
 async-std = "1.12.0"
 
 num_enum = { version = "0.5.7"}
-iced_wgpu = "0.7.0"
-iced_graphics = "0.5.0"
 image = "0.24.5"
 sysinfo = "0.27.4"
 tempfile = "3.3.0"

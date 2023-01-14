@@ -8,11 +8,7 @@ use macropad_protocol::{
 use semver::Version;
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
-use crate::{
-    hid_manager::MacropadCommand,
-    macropad_wrapper::{self, prime_device},
-    type_wrapper,
-};
+use crate::macropad_wrapper::{self, prime_device};
 
 #[derive(Debug, Clone)]
 pub enum ActionType {
@@ -364,13 +360,10 @@ pub fn parse_macro(data: &[u8; 4092]) -> Macro {
     let mut parents = Vec::new();
 
     let mut offset = 0;
-    let mut command = MacroCommand::Empty;
-    let mut delay = 0;
-    let mut delay_bytes = [0; 4];
-    let mut delay_bytes_count = 0;
-
-    let mut action: Option<ActionType> = None;
-    let mut caps = false;
+    let mut command;
+    let mut delay;
+    let mut delay_bytes;
+    let mut delay_bytes_count;
 
     while data[offset] != MacroCommand::Empty as u8 {
         command = MacroCommand::from(data[offset] >> 2);

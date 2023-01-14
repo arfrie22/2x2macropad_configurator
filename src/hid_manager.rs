@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::{fmt, sync::Mutex};
 
 use crate::{
-    macro_parser::{self, LedConfig},
+    macro_parser,
     macropad_wrapper,
 };
 

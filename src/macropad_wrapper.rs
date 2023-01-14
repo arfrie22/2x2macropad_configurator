@@ -6,8 +6,6 @@ use macropad_protocol::data_protocol::{
 };
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
-use crate::macro_parser::KeyConfig;
-
 pub const CKSUM: Crc<u32> = Crc::<u32>::new(&CRC_32_CKSUM);
 pub const MACRO_SIZE: usize = 4092;
 
@@ -38,7 +36,7 @@ pub fn prime_device(device: &HidDevice) -> Result<(), ()> {
 pub fn enter_bootloader(device: &HidDevice) -> Result<(), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::EnterBootloader as u8;
-    let buf = send_command(device, data)?;
+    send_command(device, data)?;
 
     Ok(())
 }

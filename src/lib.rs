@@ -21,7 +21,7 @@ mod tests {
         use hidapi::HidApi;
 
         use macropad_protocol::data_protocol::{KeyMode, LedEffect};
-        use usbd_human_interface_device::page::{Consumer, Keyboard};
+        use usbd_human_interface_device::page::Consumer;
 
         let mut api = HidApi::new().unwrap();
         api.refresh_devices().unwrap();
