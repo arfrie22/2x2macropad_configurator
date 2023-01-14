@@ -34,8 +34,8 @@ async fn scan_devices(api: &mut HidApi) -> Option<HidDevice> {
 async fn is_connected(api: &mut HidApi) -> bool {
     api.refresh_devices().unwrap();
     for device in api.device_list() {
-        if device.vendor_id() == 4617
-            && device.product_id() == 1
+        if device.vendor_id() == 0x554D
+            && device.product_id() == 0x2020
             && device.usage_page() == 0xff00
             && device.usage() == 1
         {

@@ -2226,6 +2226,7 @@ dependencies = [
  "num_enum",
  "reqwest",
  "rusb",
+ "semver",
  "serde",
  "serde_json",
  "strum",

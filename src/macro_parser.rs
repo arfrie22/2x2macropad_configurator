@@ -5,6 +5,7 @@ use macropad_protocol::{
     data_protocol::{KeyMode, LedEffect},
     macro_protocol::MacroCommand,
 };
+use semver::Version;
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
 use crate::{
@@ -230,6 +231,7 @@ pub struct BuildInfo {
 
 #[derive(Debug, Clone)]
 pub struct Macropad {
+    pub version: Version,
     pub macros: Vec<MacroCollection>,
     pub config: MacroConfig,
     pub key_configs: Vec<KeyConfig>,
@@ -345,7 +347,10 @@ pub fn get_macro_pad(device: &HidDevice) -> Result<Macropad, ()> {
         key_configs.push(get_key_config(device, index)?);
     }
 
+    let version = Version::parse(&build_info.git_semver).unwrap();
+
     Ok(Macropad {
+        version,
         macros,
         config,
         key_configs,

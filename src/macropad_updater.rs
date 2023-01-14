@@ -96,10 +96,6 @@ async fn scan_devices() -> Option<PathBuf> {
     pico_drive
 }
 
-async fn is_connected(pico: PathBuf) -> bool {
-    pico.exists()
-}
-
 pub fn connect() -> Subscription<Event> {
     struct Connect;
 
@@ -168,7 +164,7 @@ pub fn connect() -> Subscription<Event> {
                                 let deployed_path = pico.join("out.uf2");
                                 let mut f = File::create(&deployed_path).unwrap();
 
-                                f.write_all(&firmware);
+                                f.write_all(&firmware).unwrap();
 
                                 (Some(Event::Disconnected), State::NoDeviceFound)
                             }
