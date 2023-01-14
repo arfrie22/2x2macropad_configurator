@@ -51,7 +51,7 @@ rusb = "0.9"
 crc = "3.0"
 strum_macros = "0.24"
 strum = { version = "0.24", default-features = false, features = ["strum_macros", "derive"] }
-macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol" }
+macropad_protocol = { git = "https://github.com/arfrie22/2x2macropad_protocol", features = ["multi_versioned"] }
 async-std = "1.12.0"
 
 num_enum = { version = "0.5.7"}
