@@ -7,7 +7,7 @@ use iced::widget::{
     button, column, container, pick_list, radio, row, slider, text, text_input, Column, Container,
     Space, Text,
 };
-use iced::{alignment, executor, window, Color, Padding};
+use iced::{alignment, executor, window, Padding};
 use iced::{Application, Command, Element, Length, Settings, Subscription, Theme};
 use iced_aw::style::{BadgeStyles, TabBarStyles};
 use iced_aw::{Badge, ColorPicker, TabLabel, Tabs};
@@ -23,6 +23,7 @@ use macropad_configurator::{
 };
 use macropad_protocol::data_protocol::LedEffect;
 use num_enum::{FromPrimitive, IntoPrimitive};
+use iced_core::Color;
 
 const ACTION_DELAY: u64 = 200;
 
