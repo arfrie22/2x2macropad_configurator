@@ -7,9 +7,11 @@ pub const ROBOTO: Font = iced::Font::External {
     bytes: ROBOTO_BYTES,
 };
 
+pub const ROBOTO_BOLD_BYTES: &'static [u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
+
 pub const ROBOTO_BOLD: Font = iced::Font::External {
     name: "Roboto Bold",
-    bytes: include_bytes!("../assets/fonts/Roboto-Bold.ttf"),
+    bytes: ROBOTO_BOLD_BYTES,
 };
 
 pub const ICON_FONT: Font = iced::Font::External {

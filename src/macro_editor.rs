@@ -1,14 +1,16 @@
 use std::cell::RefCell;
 use std::ops::Sub;
 use std::rc::Rc;
+use std::sync::{Mutex, Arc};
 use std::time::Duration;
 
+use cosmic_text::FontSystem;
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke};
 use iced::{mouse, Color, Size, Vector};
 use iced::{Element, Length, Point, Rectangle, Theme};
 
-use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD};
+use crate::font::{Icon, ICON_FONT, ROBOTO, ROBOTO_BOLD, ROBOTO_BYTES, ROBOTO_BOLD_BYTES};
 use crate::macro_parser::{self, ActionType, MacroFrame};
 use crate::type_wrapper::{Chord, ConsumerWrapper, KeyboardWrapper};
 
@@ -40,6 +42,16 @@ const ARGUMENT_SIZE: f32 = 15.0;
 const ARGUMENT_TEXT_SIZE: f32 = 10.0;
 
 const MOVE_THRESHOLD: f32 = 5.0;
+
+static ROBOTO_FONTDUE: once_cell::sync::Lazy<fontdue::Font> =
+    once_cell::sync::Lazy::new(|| {
+        fontdue::Font::from_bytes(ROBOTO_BYTES, fontdue::FontSettings::default()).unwrap()
+    });
+
+static ROBOTO_BOLD_FONTDUE: once_cell::sync::Lazy<fontdue::Font> =
+    once_cell::sync::Lazy::new(|| {
+        fontdue::Font::from_bytes(ROBOTO_BOLD_BYTES, fontdue::FontSettings::default()).unwrap()
+    });
 
 #[derive(Debug, Clone)]
 pub struct Index {
@@ -1820,8 +1832,7 @@ impl Arguments {
     pub fn after_title(title: String) -> Self {
         Arguments {
             args: Vec::new(),
-            // TODO: Use real text measurement
-            offset: (title.len() as f32 * TITLE_SIZE / 2.3) + (2.0 * TITLE_OFFSET.x),
+            offset: measure_text(&title, &ROBOTO_BOLD_FONTDUE, TITLE_SIZE) + (2.0 * TITLE_OFFSET.x),
         }
     }
 
@@ -1981,7 +1992,17 @@ impl Arguments {
     }
 
     fn offset_from_text(text: String) -> f32 {
-        // TODO: Use real text measurement
-        (text.len() + 2) as f32 * ARGUMENT_TEXT_SIZE / 2.0
+        measure_text(&text, &ROBOTO_BOLD_FONTDUE, ARGUMENT_TEXT_SIZE) * 1.5
     }
+}
+
+
+fn measure_text(text: &str, font: &fontdue::Font, font_size: f32) -> f32 {
+    let mut width = 0.0;
+    for c in text.chars() {
+        let (metrics, _) = font.rasterize(c, font_size);
+        width += metrics.advance_width;
+    }
+
+    width
 }
