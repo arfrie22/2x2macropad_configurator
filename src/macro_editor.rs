@@ -1997,6 +1997,7 @@ impl Arguments {
 }
 
 
+// Waiting on https://github.com/iced-rs/iced/issues/478
 fn measure_text(text: &str, font: &fontdue::Font, font_size: f32) -> f32 {
     let mut width = 0.0;
     for c in text.chars() {
