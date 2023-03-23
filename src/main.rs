@@ -805,10 +805,10 @@ impl Application for Configurator {
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),]
                     }
                     macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
@@ -827,10 +827,10 @@ impl Application for Configurator {
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),]
                     }
                     macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
@@ -844,10 +844,10 @@ impl Application for Configurator {
                                 ),
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                             container(column![
                                 text("Key Color").size(30),
@@ -864,14 +864,16 @@ impl Application for Configurator {
                                 )
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                         ]
                     }
                     macropad_protocol::data_protocol::KeyMode::ConsumerMode => {
+
+                        
                         column![
                             container(column![
                                 text("Consumer").size(30),
@@ -882,10 +884,10 @@ impl Application for Configurator {
                                 ),
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                             container(column![
                                 text("Key Color").size(30),
@@ -902,10 +904,10 @@ impl Application for Configurator {
                                 )
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                         ]
                     }
@@ -962,10 +964,10 @@ impl Application for Configurator {
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),
                         key_settings,
                     ])
@@ -1185,10 +1187,10 @@ impl Application for Configurator {
                         .align_x(alignment::Horizontal::Center)
                         .align_y(alignment::Vertical::Top)
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),
                     container(row![
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
@@ -1202,7 +1204,7 @@ impl Application for Configurator {
                 .width(Length::Units(300))
                 .padding(Padding {
                     top: 0,
-                    right: 0,
+                    right: 0.0,
                     bottom: 0,
                     left: 20,
                 });
@@ -1402,7 +1404,7 @@ impl KeyTab {
     fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
         match action {
             hid_manager::MacropadCommand::KeyMode(key, mode) => {
-                self.key_configs[key as usize].key_mode = mode;
+                self.key_configs[key as usize].key_mode = Some(mode);
                 self.actions.insert(
                     macropad_protocol::data_protocol::KeyConfigElements::KeyMode,
                     (
@@ -1413,7 +1415,7 @@ impl KeyTab {
                 );
             }
             hid_manager::MacropadCommand::KeyboardData(key, keyboard) => {
-                self.key_configs[key as usize].keyboard_data = keyboard;
+                self.key_configs[key as usize].keyboard_data = Some(keyboard);
                 self.actions.insert(
                     macropad_protocol::data_protocol::KeyConfigElements::KeyboardData,
                     (
@@ -1424,7 +1426,7 @@ impl KeyTab {
                 );
             }
             hid_manager::MacropadCommand::ConsumerData(key, consumer) => {
-                self.key_configs[key as usize].consumer_data = consumer;
+                self.key_configs[key as usize].consumer_data = Some(consumer);
                 self.actions.insert(
                     macropad_protocol::data_protocol::KeyConfigElements::ConsumerData,
                     (
@@ -1435,7 +1437,7 @@ impl KeyTab {
                 );
             }
             hid_manager::MacropadCommand::KeyColor(key, color) => {
-                self.key_configs[key as usize].key_color = color;
+                self.key_configs[key as usize].key_color = Some(color);
                 self.actions.insert(
                     macropad_protocol::data_protocol::KeyConfigElements::KeyColor,
                     (
@@ -1543,7 +1545,7 @@ impl LedTab {
     fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
         match action {
             hid_manager::MacropadCommand::LedBaseColor(color) => {
-                self.config.base_color = color;
+                self.config.base_color = Some(color);
                 self.actions.insert(
                     macropad_protocol::data_protocol::LedCommand::BaseColor,
                     (
@@ -1554,7 +1556,7 @@ impl LedTab {
                 );
             }
             hid_manager::MacropadCommand::LedEffect(effect) => {
-                self.config.effect = effect;
+                self.config.effect = Some(effect);
                 self.actions.insert(
                     macropad_protocol::data_protocol::LedCommand::Effect,
                     (
@@ -1565,7 +1567,7 @@ impl LedTab {
                 );
             }
             hid_manager::MacropadCommand::LedBrightness(brightness) => {
-                self.config.brightness = brightness;
+                self.config.brightness = Some(brightness);
                 self.actions.insert(
                     macropad_protocol::data_protocol::LedCommand::Brightness,
                     (
@@ -1576,7 +1578,7 @@ impl LedTab {
                 );
             }
             hid_manager::MacropadCommand::LedEffectPeriod(period) => {
-                self.config.effect_period = period;
+                self.config.effect_period = Some(period);
                 self.actions.insert(
                     macropad_protocol::data_protocol::LedCommand::EffectPeriod,
                     (
@@ -1587,7 +1589,7 @@ impl LedTab {
                 );
             }
             hid_manager::MacropadCommand::LedEffectOffset(offset) => {
-                self.config.effect_offset = offset;
+                self.config.effect_offset = Some(offset);
                 self.actions.insert(
                     macropad_protocol::data_protocol::LedCommand::EffectOffset,
                     (
@@ -1638,10 +1640,10 @@ impl Tab for LedTab {
                     ),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Period").size(30),
@@ -1662,10 +1664,10 @@ impl Tab for LedTab {
                     ],
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Brightness").size(30),
@@ -1686,10 +1688,10 @@ impl Tab for LedTab {
                     ],
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Base Color").size(30),
@@ -1706,10 +1708,10 @@ impl Tab for LedTab {
                     )
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
             ],
             macropad::macropad_led(self.led_runner.get_leds(&self.config)),
@@ -1770,7 +1772,7 @@ impl SettingsTab {
     fn queue_action(&mut self, action: hid_manager::MacropadCommand) {
         match action {
             hid_manager::MacropadCommand::TapSpeed(speed) => {
-                self.config.tap_speed = speed;
+                self.config.tap_speed = Some(speed);
                 self.actions.insert(
                     macropad_protocol::data_protocol::ConfigElements::TapSpeed,
                     (
@@ -1781,7 +1783,7 @@ impl SettingsTab {
                 );
             }
             hid_manager::MacropadCommand::HoldSpeed(speed) => {
-                self.config.hold_speed = speed;
+                self.config.hold_speed = Some(speed);
                 self.actions.insert(
                     macropad_protocol::data_protocol::ConfigElements::HoldSpeed,
                     (
@@ -1853,10 +1855,10 @@ impl Tab for SettingsTab {
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Hold Time (ms)").size(30),
@@ -1868,10 +1870,10 @@ impl Tab for SettingsTab {
                     .width(Length::Units(50)),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(button(text("Update Macropad")).on_press(Message::MacropadBootloader))
                     // .width(Length::Fill)

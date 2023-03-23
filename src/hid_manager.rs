@@ -80,54 +80,55 @@ pub fn connect() -> Subscription<Event> {
                     )
                     .await;
                     if let Ok(command) = command {
+                        let version = macropad.lock().unwrap().version.clone();
                         match command {
                             Message::Set(command) => {
                                 let res = match command {
                                     MacropadCommand::Bootloader => {
-                                        macropad_wrapper::enter_bootloader(&device)
+                                        macropad_wrapper::enter_bootloader(&device, &version)
                                     }
                                     MacropadCommand::KeyMode(i, mode) => {
-                                        macropad_wrapper::set_key_mode(&device, i, mode).and_then(
+                                        macropad_wrapper::set_key_mode(&device, &version, i, mode).and_then(
                                             |_| {
                                                 macropad.lock().unwrap().key_configs[i as usize]
-                                                    .key_mode = mode;
+                                                    .key_mode = Some(mode);
                                                 Ok(())
                                             },
                                         )
                                     }
                                     MacropadCommand::KeyboardData(i, data) => {
-                                        macropad_wrapper::set_keyboard_data(&device, i, data)
+                                        macropad_wrapper::set_keyboard_data(&device, &version, i, data)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().key_configs[i as usize]
-                                                    .keyboard_data = data;
+                                                    .keyboard_data = Some(data);
                                                 Ok(())
                                             })
                                     }
                                     MacropadCommand::ConsumerData(i, data) => {
-                                        macropad_wrapper::set_consumer_data(&device, i, data)
+                                        macropad_wrapper::set_consumer_data(&device, &version, i, data)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().key_configs[i as usize]
-                                                    .consumer_data = data;
+                                                    .consumer_data = Some(data);
                                                 Ok(())
                                             })
                                     }
                                     MacropadCommand::KeyColor(i, color) => {
-                                        macropad_wrapper::set_key_color(&device, i, color).and_then(
+                                        macropad_wrapper::set_key_color(&device, &version, i, color).and_then(
                                             |_| {
                                                 macropad.lock().unwrap().key_configs[i as usize]
-                                                    .key_color = color;
+                                                    .key_color = Some(color);
                                                 Ok(())
                                             },
                                         )
                                     }
                                     MacropadCommand::Macro(i, macro_data) => {
                                         macro_data.pack().and_then(|data| {
-                                            macropad_wrapper::clear_macro(&device, i).and_then(
+                                            macropad_wrapper::clear_macro(&device, &version, i).and_then(
                                                 |_| {
-                                                    macropad_wrapper::set_macro(&device, i, &data)
+                                                    macropad_wrapper::set_macro(&device, &version, i, &data)
                                                         .and_then(|_| {
                                                             macropad_wrapper::validate_macro(
-                                                                &device, i, &data,
+                                                                &device, &version, i, &data,
                                                             )
                                                             .and_then(|_| {
                                                                 macropad.lock().unwrap().set_macro(
@@ -141,58 +142,58 @@ pub fn connect() -> Subscription<Event> {
                                         })
                                     }
                                     MacropadCommand::TapSpeed(speed) => {
-                                        macropad_wrapper::set_tap_speed(&device, speed).and_then(
+                                        macropad_wrapper::set_tap_speed(&device, &version, speed).and_then(
                                             |_| {
-                                                macropad.lock().unwrap().config.tap_speed = speed;
+                                                macropad.lock().unwrap().config.tap_speed = Some(speed);
                                                 Ok(())
                                             },
                                         )
                                     }
                                     MacropadCommand::HoldSpeed(speed) => {
-                                        macropad_wrapper::set_hold_speed(&device, speed).and_then(
+                                        macropad_wrapper::set_hold_speed(&device, &version, speed).and_then(
                                             |_| {
-                                                macropad.lock().unwrap().config.hold_speed = speed;
+                                                macropad.lock().unwrap().config.hold_speed = Some(speed);
                                                 Ok(())
                                             },
                                         )
                                     }
                                     MacropadCommand::LedBaseColor(color) => {
-                                        macropad_wrapper::set_led_base_color(&device, color)
+                                        macropad_wrapper::set_led_base_color(&device, &version, color)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().led_config.base_color =
-                                                    color;
+                                                    Some(color);
                                                 Ok(())
                                             })
                                     }
                                     MacropadCommand::LedEffect(effect) => {
-                                        macropad_wrapper::set_led_effect(&device, effect).and_then(
+                                        macropad_wrapper::set_led_effect(&device, &version, effect).and_then(
                                             |_| {
-                                                macropad.lock().unwrap().led_config.effect = effect;
+                                                macropad.lock().unwrap().led_config.effect = Some(effect);
                                                 Ok(())
                                             },
                                         )
                                     }
                                     MacropadCommand::LedBrightness(brightness) => {
-                                        macropad_wrapper::set_led_brightness(&device, brightness)
+                                        macropad_wrapper::set_led_brightness(&device, &version, brightness)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().led_config.brightness =
-                                                    brightness;
+                                                    Some(brightness);
                                                 Ok(())
                                             })
                                     }
                                     MacropadCommand::LedEffectPeriod(period) => {
-                                        macropad_wrapper::set_led_effect_period(&device, period)
+                                        macropad_wrapper::set_led_effect_period(&device, &version, period)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().led_config.effect_period =
-                                                    period;
+                                                    Some(period);
                                                 Ok(())
                                             })
                                     }
                                     MacropadCommand::LedEffectOffset(offset) => {
-                                        macropad_wrapper::set_led_effect_offset(&device, offset)
+                                        macropad_wrapper::set_led_effect_offset(&device, &version, offset)
                                             .and_then(|_| {
                                                 macropad.lock().unwrap().led_config.effect_offset =
-                                                    offset;
+                                                    Some(offset);
                                                 Ok(())
                                             })
                                     }

@@ -43,18 +43,23 @@ pub fn hsv2rgb(hue: f32, sat: f32, val: f32) -> (f32, f32, f32) {
 
 impl LedRunner {
     pub fn get_leds(&self, config: &LedConfig) -> [Color; 4] {
-        match config.effect {
+        let effect = config.effect.unwrap_or(macropad_protocol::data_protocol::LedEffect::None);
+        let base_color = config.base_color.unwrap_or_default();
+        let brightness = config.brightness.unwrap_or_default();
+        let effect_period = config.effect_period.unwrap_or_default();
+
+        match &effect {
             macropad_protocol::data_protocol::LedEffect::None => [Color::TRANSPARENT; 4],
             macropad_protocol::data_protocol::LedEffect::Static => {
                 [Color::from_rgba8(
-                    config.base_color.0,
-                    config.base_color.1,
-                    config.base_color.2,
-                    config.brightness as f32 / 255.0,
+                    base_color.0,
+                    base_color.1,
+                    base_color.2,
+                    brightness as f32 / 255.0,
                 ); 4]
             }
             macropad_protocol::data_protocol::LedEffect::Breathing => {
-                let color = config.base_color;
+                let color = base_color;
 
                 let mut time = self.timer * (100.0 / 1000.0);
 
@@ -66,11 +71,11 @@ impl LedRunner {
                     color.0,
                     color.1,
                     color.2,
-                    (time / 50.0) * (config.brightness as f32 / 255.0),
+                    (time / 50.0) * (brightness as f32 / 255.0),
                 ); 4]
             }
             macropad_protocol::data_protocol::LedEffect::BreathingSpaced => {
-                let color = config.base_color;
+                let color = base_color;
                 let timer = self.timer * (400.0 / 1000.0);
 
                 let mut backlight = [Color::BLACK; 4];
@@ -92,7 +97,7 @@ impl LedRunner {
                         color.0,
                         color.1,
                         color.2,
-                        (time / 50.0) * (config.brightness as f32 / 255.0),
+                        (time / 50.0) * (brightness as f32 / 255.0),
                     );
                 }
 
@@ -102,7 +107,7 @@ impl LedRunner {
                 let timer = self.timer * (360.0 / 1000.0);
                 let color = hsv2rgb(timer, 1.0, 1.0);
 
-                [Color::from_rgba(color.0, color.1, color.2, config.brightness as f32 / 255.0); 4]
+                [Color::from_rgba(color.0, color.1, color.2, brightness as f32 / 255.0); 4]
             }
             macropad_protocol::data_protocol::LedEffect::Rainbow => {
                 let timer = self.timer * (360.0 / 1000.0);
@@ -114,7 +119,7 @@ impl LedRunner {
                         color.0,
                         color.1,
                         color.2,
-                        config.brightness as f32 / 255.0,
+                        brightness as f32 / 255.0,
                     );
                 }
 
@@ -124,8 +129,8 @@ impl LedRunner {
     }
 
     pub fn update(&mut self, config: &LedConfig) {
-        if config.effect_period != 0.0 {
-            self.timer += (1.0 / config.effect_period)
+        if config.effect_period.unwrap_or_default() != 0.0 {
+            self.timer += (1.0 / config.effect_period.unwrap_or_default())
                 * ((Instant::now().duration_since(self.last_update).as_micros()) as f32 / 1000.0);
 
             self.timer = self.timer % 1000.0;

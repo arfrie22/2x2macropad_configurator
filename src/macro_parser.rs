@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use hidapi::HidDevice;
 use macropad_protocol::{
-    data_protocol::{KeyMode, LedEffect},
+    data_protocol::{KeyMode, LedEffect, KeyConfigElements},
     macro_protocol::MacroCommand,
 };
 use semver::Version;
 use usbd_human_interface_device::page::{Consumer, Keyboard};
 
-use crate::macropad_wrapper::{self, prime_device};
+use crate::macropad_wrapper::{self, prime_device, get_build_version};
 
 #[derive(Debug, Clone)]
 pub enum ActionType {
@@ -151,78 +151,46 @@ impl Default for Macro {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MacroConfig {
-    pub tap_speed: u32,
-    pub hold_speed: u32,
+    pub tap_speed: Option<u32>,
+    pub hold_speed: Option<u32>,
 }
 
-impl Default for MacroConfig {
-    fn default() -> Self {
-        Self {
-            tap_speed: 200,
-            hold_speed: 200,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct KeyConfig {
-    pub key_mode: KeyMode,
-    pub keyboard_data: Keyboard,
-    pub consumer_data: Consumer,
-    pub key_color: (u8, u8, u8),
+    pub key_mode: Option<KeyMode>,
+    pub keyboard_data: Option<Keyboard>,
+    pub consumer_data: Option<Consumer>,
+    pub key_color: Option<(u8, u8, u8)>,
 }
 
-impl Default for KeyConfig {
-    fn default() -> Self {
-        Self {
-            key_mode: KeyMode::MacroMode,
-            keyboard_data: Keyboard::NoEventIndicated,
-            consumer_data: Consumer::Unassigned,
-            key_color: (0, 0, 0),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LedConfig {
-    pub base_color: (u8, u8, u8),
-    pub effect: LedEffect,
-    pub brightness: u8,
-    pub effect_period: f32,
-    pub effect_offset: f32,
-}
-
-impl Default for LedConfig {
-    fn default() -> Self {
-        Self {
-            base_color: (0, 0, 0),
-            effect: LedEffect::None,
-            brightness: 0xA0,
-            effect_period: 1.0,
-            effect_offset: 0.0,
-        }
-    }
+    pub base_color: Option<(u8, u8, u8)>,
+    pub effect: Option<LedEffect>,
+    pub brightness: Option<u8>,
+    pub effect_period: Option<f32>,
+    pub effect_offset: Option<f32>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct MacroCollection {
-    pub tap: Macro,
-    pub hold: Macro,
-    pub double_tap: Macro,
-    pub tap_hold: Macro,
+    pub tap: Option<Macro>,
+    pub hold: Option<Macro>,
+    pub double_tap: Option<Macro>,
+    pub tap_hold: Option<Macro>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct BuildInfo {
-    pub firmware_version: String,
-    pub build_date: String,
-    pub build_timestamp: String,
-    pub build_profile: String,
-    pub git_hash: String,
-    pub git_branch: String,
-    pub git_semver: String,
+    pub firmware_version: Option<String>,
+    pub build_date: Option<String>,
+    pub build_timestamp: Option<String>,
+    pub build_profile: Option<String>,
+    pub git_hash: Option<String>,
+    pub git_branch: Option<String>,
+    pub git_semver: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -238,20 +206,20 @@ pub struct Macropad {
 impl Macropad {
     pub fn set_macro(&mut self, index: usize, macro_data: Macro) {
         match index & 0b11 {
-            0 => self.macros[index >> 2].tap = macro_data,
-            1 => self.macros[index >> 2].hold = macro_data,
-            2 => self.macros[index >> 2].double_tap = macro_data,
-            3 => self.macros[index >> 2].tap_hold = macro_data,
+            0 => self.macros[index >> 2].tap = Some(macro_data),
+            1 => self.macros[index >> 2].hold = Some(macro_data),
+            2 => self.macros[index >> 2].double_tap = Some(macro_data),
+            3 => self.macros[index >> 2].tap_hold = Some(macro_data),
             _ => (),
         }
     }
 }
 
-pub fn get_key_config(device: &HidDevice, index: u8) -> Result<KeyConfig, ()> {
-    let key_mode = macropad_wrapper::get_key_mode(device, index)?;
-    let keyboard_data = macropad_wrapper::get_keyboard_data(device, index)?;
-    let consumer_data = macropad_wrapper::get_consumer_data(device, index)?;
-    let key_color = macropad_wrapper::get_key_color(device, index)?;
+pub fn get_key_config(device: &HidDevice, version: &Version, index: u8) -> Result<KeyConfig, ()> {
+    let key_mode = macropad_wrapper::get_key_mode(device, version, index)?;
+    let keyboard_data = macropad_wrapper::get_keyboard_data(device, version, index)?;
+    let consumer_data = macropad_wrapper::get_consumer_data(device, version, index)?;
+    let key_color = macropad_wrapper::get_key_color(device, version, index)?;
 
     Ok(KeyConfig {
         key_mode,
@@ -261,17 +229,21 @@ pub fn get_key_config(device: &HidDevice, index: u8) -> Result<KeyConfig, ()> {
     })
 }
 
-pub fn get_macro(device: &HidDevice, index: u8) -> Result<Macro, ()> {
-    let data = macropad_wrapper::get_macro(device, index)?;
-    Ok(parse_macro(&data))
+pub fn get_macro(device: &HidDevice, version: &Version, index: u8) -> Result<Option<Macro>, ()> {
+    let data = macropad_wrapper::get_macro(device, version, index)?;
+    if let Some(data) = data {
+        Ok(Some(parse_macro(&data)))
+    } else {
+        Ok(None)
+    }
 }
 
-pub fn get_macro_collection(device: &HidDevice, index: u8) -> Result<MacroCollection, ()> {
+pub fn get_macro_collection(device: &HidDevice, version: &Version, index: u8) -> Result<MacroCollection, ()> {
     let mut collection = MacroCollection::default();
 
     for m in 0..4 {
-        let data = macropad_wrapper::get_macro(device, (index << 2) | m)?;
-        let macro_data = parse_macro(&data);
+        let macro_data = get_macro(device, version, (index << 2) | m)?;
+
         match m {
             0 => collection.tap = macro_data,
             1 => collection.hold = macro_data,
@@ -284,9 +256,9 @@ pub fn get_macro_collection(device: &HidDevice, index: u8) -> Result<MacroCollec
     Ok(collection)
 }
 
-pub fn get_config(device: &HidDevice) -> Result<MacroConfig, ()> {
-    let tap_speed = macropad_wrapper::get_tap_speed(device)?;
-    let hold_speed = macropad_wrapper::get_hold_speed(device)?;
+pub fn get_config(device: &HidDevice, version: &Version) -> Result<MacroConfig, ()> {
+    let tap_speed = macropad_wrapper::get_tap_speed(device, version)?;
+    let hold_speed = macropad_wrapper::get_hold_speed(device, version)?;
 
     Ok(MacroConfig {
         tap_speed,
@@ -294,12 +266,12 @@ pub fn get_config(device: &HidDevice) -> Result<MacroConfig, ()> {
     })
 }
 
-pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
-    let base_color = macropad_wrapper::get_led_base_color(device)?;
-    let effect = macropad_wrapper::get_led_effect(device)?;
-    let brightness = macropad_wrapper::get_led_brightness(device)?;
-    let effect_period = macropad_wrapper::get_led_effect_period(device)?;
-    let effect_offset = macropad_wrapper::get_led_effect_offset(device)?;
+pub fn get_led_config(device: &HidDevice, version: &Version) -> Result<LedConfig, ()> {
+    let base_color = macropad_wrapper::get_led_base_color(device, version)?;
+    let effect = macropad_wrapper::get_led_effect(device, version)?;
+    let brightness = macropad_wrapper::get_led_brightness(device, version)?;
+    let effect_period = macropad_wrapper::get_led_effect_period(device, version)?;
+    let effect_offset = macropad_wrapper::get_led_effect_offset(device, version)?;
 
     Ok(LedConfig {
         base_color,
@@ -310,14 +282,14 @@ pub fn get_led_config(device: &HidDevice) -> Result<LedConfig, ()> {
     })
 }
 
-pub fn get_build_info(device: &HidDevice) -> Result<BuildInfo, ()> {
-    let firmware_version = macropad_wrapper::get_firmware_version(device)?;
-    let build_date = macropad_wrapper::get_build_date(device)?;
-    let build_timestamp = macropad_wrapper::get_build_timestamp(device)?;
-    let build_profile = macropad_wrapper::get_build_profile(device)?;
-    let git_hash = macropad_wrapper::get_git_hash(device)?;
-    let git_branch = macropad_wrapper::get_git_branch(device)?;
-    let git_semver = macropad_wrapper::get_git_semver(device)?;
+pub fn get_build_info(device: &HidDevice, version: &Version) -> Result<BuildInfo, ()> {
+    let firmware_version = macropad_wrapper::get_firmware_version(device, version)?;
+    let build_date = macropad_wrapper::get_build_date(device, version)?;
+    let build_timestamp = macropad_wrapper::get_build_timestamp(device, version)?;
+    let build_profile = macropad_wrapper::get_build_profile(device, version)?;
+    let git_hash = macropad_wrapper::get_git_hash(device, version)?;
+    let git_branch = macropad_wrapper::get_git_branch(device, version)?;
+    let git_semver = macropad_wrapper::get_git_semver(device, version)?;
 
     Ok(BuildInfo {
         firmware_version,
@@ -332,18 +304,22 @@ pub fn get_build_info(device: &HidDevice) -> Result<BuildInfo, ()> {
 
 pub fn get_macro_pad(device: &HidDevice) -> Result<Macropad, ()> {
     prime_device(device)?;
+    let version = if let Ok(version) = Version::parse(&get_build_version(device)?) {
+        version
+    } else {
+        return Err(());
+    };
+
     let mut macros = Vec::new();
-    let config = get_config(device)?;
+    let config = get_config(device, &version)?;
     let mut key_configs = Vec::new();
-    let led_config = get_led_config(device)?;
-    let build_info = get_build_info(device)?;
+    let led_config = get_led_config(device, &version)?;
+    let build_info = get_build_info(device, &version)?;
 
     for index in 0..4 {
-        macros.push(get_macro_collection(device, index)?);
-        key_configs.push(get_key_config(device, index)?);
+        macros.push(get_macro_collection(device, &version, index)?);
+        key_configs.push(get_key_config(device, &version, index)?);
     }
-
-    let version = Version::parse(&build_info.git_semver).unwrap();
 
     Ok(Macropad {
         version,
