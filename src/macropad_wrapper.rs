@@ -33,6 +33,19 @@ pub fn prime_device(device: &HidDevice) -> Result<(), ()> {
     Ok(())
 }
 
+pub fn get_build_version(device: &HidDevice) -> Result<String, ()> {
+    let mut data = [0u8; 65];
+    data[1] = DataCommand::GetBuildVersion as u8;
+    let buf = send_command(device, data)?;
+
+    if data[1] != buf[0] {
+        Err(())
+    } else {
+        let len = buf[1] as usize;
+        Ok(String::from_utf8(buf[2..2 + len].to_vec()).unwrap())
+    }
+}
+
 pub fn enter_bootloader(device: &HidDevice) -> Result<(), ()> {
     let mut data = [0u8; 65];
     data[1] = DataCommand::EnterBootloader as u8;

@@ -22,7 +22,7 @@ use macropad_configurator::{
     hid_manager, macro_editor, macro_parser, macropad, macropad_updater, type_wrapper,
 };
 use macropad_protocol::data_protocol::LedEffect;
-use num_enum::{FromPrimitive, IntoPrimitive};
+use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
 use iced_core::Color;
 
 const ACTION_DELAY: u64 = 200;
@@ -278,7 +278,7 @@ impl Application for Configurator {
             }
             Message::LedUpdate(_) => {
                 if let State::Connected(con, Page::MainPage(id)) = &mut self.state {
-                    if TabId::from(*id) == TabId::ModifyLed {
+                    if TabId::try_from(*id).unwrap() == TabId::ModifyLed {
                         self.led_tab
                             .led_runner
                             .update(&con.get_macropad().lock().unwrap().led_config);
@@ -296,7 +296,7 @@ impl Application for Configurator {
                 self.state = State::Connected(
                     match &mut self.state {
                         State::Connected(connection, _) => {
-                            match TabId::from(i) {
+                            match TabId::try_from(i).unwrap() {
                                 TabId::MainPage => {
                                     self.key_tab.update_config(connection.get_macropad());
                                 }
@@ -782,7 +782,7 @@ impl Application for Configurator {
                 .tab_bar_style(TabBarStyles::Purple)
                 .icon_font(ICON_FONT)
                 .tab_bar_position(iced_aw::TabBarPosition::Bottom)
-                .text_size(20)
+                .text_size(20.0)
                 .into(),
             State::Connected(_, Page::ModifyKey(i)) => {
                 let key_settings = match self.key_tab.key_configs[*i].key_mode {
@@ -792,23 +792,23 @@ impl Application for Configurator {
                             row![
                                 button("Tap Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Hold Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Double Tap Macro").on_press(Message::LoadMacro(
                                     macro_parser::MacroType::DoubleTap
                                 )),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Tap and Hold Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::TapHold)),
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),]
                     }
                     macropad_protocol::data_protocol::KeyMode::SingleTapMode => {
@@ -817,20 +817,20 @@ impl Application for Configurator {
                             row![
                                 button("Tap Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Tap)),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Hold Macro")
                                     .on_press(Message::LoadMacro(macro_parser::MacroType::Hold)),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Double Tap Macro"),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 button("Tap and Hold Macro"),
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),]
                     }
                     macropad_protocol::data_protocol::KeyMode::KeyboardMode => {
@@ -844,10 +844,10 @@ impl Application for Configurator {
                                 ),
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                             container(column![
                                 text("Key Color").size(30),
@@ -864,10 +864,10 @@ impl Application for Configurator {
                                 )
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                         ]
                     }
@@ -882,10 +882,10 @@ impl Application for Configurator {
                                 ),
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                             container(column![
                                 text("Key Color").size(30),
@@ -902,10 +902,10 @@ impl Application for Configurator {
                                 )
                             ])
                             .padding(Padding {
-                                top: 20,
-                                right: 0,
-                                bottom: 20,
-                                left: 0,
+                                top: 20.0,
+                                right: 0.0,
+                                bottom: 20.0,
+                                left: 0.0,
                             }),
                         ]
                     }
@@ -938,21 +938,21 @@ impl Application for Configurator {
                                     selected_key_mode,
                                     Message::KeyModeChanged
                                 ),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 radio(
                                     "Single Tap Mode",
                                     macropad_protocol::data_protocol::KeyMode::SingleTapMode,
                                     selected_key_mode,
                                     Message::KeyModeChanged
                                 ),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 radio(
                                     "Keyboard Mode",
                                     macropad_protocol::data_protocol::KeyMode::KeyboardMode,
                                     selected_key_mode,
                                     Message::KeyModeChanged
                                 ),
-                                Space::with_width(Length::Units(20)),
+                                Space::with_width(Length::Fixed(20.0)),
                                 radio(
                                     "Consumer Mode",
                                     macropad_protocol::data_protocol::KeyMode::ConsumerMode,
@@ -962,10 +962,10 @@ impl Application for Configurator {
                             ],
                         ])
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),
                         key_settings,
                     ])
@@ -991,7 +991,7 @@ impl Application for Configurator {
                 let action_settings = if let Some(action) = self.key_tab.selected_action.as_ref() {
                     let action_delay = container(column![
                         text("Post Action Delay (ms)").size(30),
-                        Space::with_height(Length::Units(10)),
+                        Space::with_height(Length::Fixed(10.0)),
                         text_input(
                             action.delay.as_millis().to_string().as_str(),
                             self.key_tab.action_option_controls.delay_text.as_str(),
@@ -1006,7 +1006,7 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::SetLed(color) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("LED Color").size(30),
                                 ColorPicker::new(
                                     self.key_tab.action_option_controls.show_color_picker,
@@ -1023,9 +1023,9 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::KeyDown(key) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Key").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
                                     Some(key.clone().into()),
@@ -1036,9 +1036,9 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::KeyUp(key) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Key").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
                                     Some(key.clone().into()),
@@ -1049,17 +1049,17 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::KeyPress(key, delay) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Key").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 pick_list(
                                     &type_wrapper::KeyboardWrapper::KEYS[..],
                                     Some(key.clone().into()),
                                     Message::MacroActionChooseKey
                                 ),
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Hold Time (ms)").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
@@ -1070,17 +1070,17 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::ConsumerPress(key, delay) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Consumer").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 pick_list(
                                     &type_wrapper::ConsumerWrapper::KEYS[..],
                                     Some(key.clone().into()),
                                     Message::MacroActionChooseConsumer
                                 ),
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Hold Time (ms)").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
@@ -1091,17 +1091,17 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::String(string, delay) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Text").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     string.as_str(),
                                     self.key_tab.action_option_controls.string_text.as_str(),
                                     Message::MacroActionStringChangedText
                                 ),
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Letter Delay (ms)").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
@@ -1113,25 +1113,25 @@ impl Application for Configurator {
                             // TODO: Chord should have check boxes to choose ctrl + shift + alt + GUI, also same as string \n and \t should be repalced by a down and right arrow respectively
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Keys").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     chord.string.as_str(),
                                     self.key_tab.action_option_controls.chord_text.as_str(),
                                     Message::MacroActionChordChangedText
                                 ),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 checkbox("Ctrl", chord.ctrl, Message::MacroActionChordCtrl),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 checkbox("Shift", chord.shift, Message::MacroActionChordShift),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 checkbox("Alt", chord.alt, Message::MacroActionChordAlt),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 checkbox("GUI", chord.gui, Message::MacroActionChordGui),
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Hold Time (ms)").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
@@ -1142,17 +1142,17 @@ impl Application for Configurator {
                         macro_editor::ActionOptions::Loop(delay, count) => {
                             column![
                                 action_delay,
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Per Loop Delay (ms)").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     delay.as_millis().to_string().as_str(),
                                     self.key_tab.action_option_controls.sub_delay_text.as_str(),
                                     Message::MacroActionSubDelayChangedText
                                 ),
-                                Space::with_height(Length::Units(20)),
+                                Space::with_height(Length::Fixed(20.0)),
                                 text("Loop Count").size(30),
-                                Space::with_height(Length::Units(10)),
+                                Space::with_height(Length::Fixed(10.0)),
                                 text_input(
                                     count.to_string().as_str(),
                                     self.key_tab.action_option_controls.loop_count_text.as_str(),
@@ -1168,7 +1168,7 @@ impl Application for Configurator {
                 let macro_controls = container(column![
                     row![
                         text("Macro Size:").size(30),
-                        Space::with_width(Length::Units(10)),
+                        Space::with_width(Length::Fixed(10.0)),
                         Badge::new(Text::new(format!("{}/4092", macro_size))).style(
                             if macro_size > 4092 {
                                 BadgeStyles::Danger
@@ -1185,26 +1185,26 @@ impl Application for Configurator {
                         .align_x(alignment::Horizontal::Center)
                         .align_y(alignment::Vertical::Top)
                         .padding(Padding {
-                            top: 20,
-                            right: 0,
-                            bottom: 20,
-                            left: 0,
+                            top: 20.0,
+                            right: 0.0,
+                            bottom: 20.0,
+                            left: 0.0,
                         }),
                     container(row![
                         container(button("Cancel").on_press(Message::ButtonPressed(*i))),
-                        Space::with_width(Length::Units(40)),
+                        Space::with_width(Length::Fixed(40.0)),
                         button("Save").on_press(Message::SaveMacro),
                     ])
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center)
                     .align_y(alignment::Vertical::Bottom)
                 ])
-                .width(Length::Units(300))
+                .width(Length::Fixed(300.0))
                 .padding(Padding {
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    left: 20,
+                    top: 0.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 20.0,
                 });
 
                 let message = column![
@@ -1253,7 +1253,7 @@ enum Page {
 
 #[repr(usize)]
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, IntoPrimitive, FromPrimitive,
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, IntoPrimitive, TryFromPrimitive,
 )]
 enum TabId {
     #[num_enum(default)]
@@ -1638,10 +1638,10 @@ impl Tab for LedTab {
                     ),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Period").size(30),
@@ -1651,21 +1651,21 @@ impl Tab for LedTab {
                             self.config.effect_period * 10.0,
                             Message::LedPeriodChanged
                         )
-                        .width(Length::Units(200)),
-                        Space::with_width(Length::Units(20)),
+                        .width(Length::Fixed(200.0)),
+                        Space::with_width(Length::Fixed(20.0)),
                         text_input(
                             self.config.effect_period.to_string().as_str(),
                             self.period_text.as_str(),
                             Message::LedPeriodChangedText
                         )
-                        .width(Length::Units(50)),
+                        .width(Length::Fixed(50.0)),
                     ],
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Brightness").size(30),
@@ -1675,21 +1675,21 @@ impl Tab for LedTab {
                             self.config.brightness as f32,
                             Message::LedBrightnessChanged
                         )
-                        .width(Length::Units(200)),
-                        Space::with_width(Length::Units(20)),
+                        .width(Length::Fixed(200.0)),
+                        Space::with_width(Length::Fixed(20.0)),
                         text_input(
                             self.config.brightness.to_string().as_str(),
                             self.brightness_text.as_str(),
                             Message::LedBrightnessChangedText
                         )
-                        .width(Length::Units(50)),
+                        .width(Length::Fixed(50.0)),
                     ],
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Base Color").size(30),
@@ -1706,10 +1706,10 @@ impl Tab for LedTab {
                     )
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
             ],
             macropad::macropad_led(self.led_runner.get_leds(&self.config)),
@@ -1850,13 +1850,13 @@ impl Tab for SettingsTab {
                         self.press_time_text.as_str(),
                         Message::PressTimeChangedText
                     )
-                    .width(Length::Units(50)),
+                    .width(Length::Fixed(50.0)),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(column![
                     text("Hold Time (ms)").size(30),
@@ -1865,13 +1865,13 @@ impl Tab for SettingsTab {
                         self.hold_time_text.as_str(),
                         Message::HoldTimeChangedText
                     )
-                    .width(Length::Units(50)),
+                    .width(Length::Fixed(50.0)),
                 ])
                 .padding(Padding {
-                    top: 20,
-                    right: 0,
-                    bottom: 20,
-                    left: 0,
+                    top: 20.0,
+                    right: 0.0,
+                    bottom: 20.0,
+                    left: 0.0,
                 }),
                 container(button(text("Update Macropad")).on_press(Message::MacropadBootloader))
                     // .width(Length::Fill)

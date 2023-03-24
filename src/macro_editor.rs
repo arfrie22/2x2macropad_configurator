@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::ops::Sub;
 use std::rc::Rc;
-use std::sync::{Mutex, Arc};
+
 use std::time::Duration;
 
-use cosmic_text::FontSystem;
+
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke};
 use iced::{mouse, Color, Size, Vector};
